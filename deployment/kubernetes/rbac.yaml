@@ -1,0 +1,43 @@
+# Arcana Cloud Rust - RBAC Configuration
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arcana-service-account
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-cloud
+    app.kubernetes.io/part-of: arcana
+---
+# Role for reading configmaps and secrets within the namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: arcana-role
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-cloud
+    app.kubernetes.io/part-of: arcana
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arcana-role-binding
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-cloud
+    app.kubernetes.io/part-of: arcana
+subjects:
+  - kind: ServiceAccount
+    name: arcana-service-account
+    namespace: arcana
+roleRef:
+  kind: Role
+  name: arcana-role
+  apiGroup: rbac.authorization.k8s.io

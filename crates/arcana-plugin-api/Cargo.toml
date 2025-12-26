@@ -1,0 +1,18 @@
+[package]
+name = "arcana-plugin-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Plugin API for Arcana Cloud Rust - WASM plugin interface definitions"
+
+[dependencies]
+serde = { workspace = true }
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+[features]
+default = ["host"]
+host = []
+wasm = []

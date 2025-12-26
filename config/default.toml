@@ -1,0 +1,65 @@
+# Arcana Cloud Rust - Default Configuration
+
+[app]
+name = "arcana-cloud"
+version = "0.1.0"
+environment = "development"
+
+[server]
+rest_host = "0.0.0.0"
+rest_port = 8080
+grpc_host = "0.0.0.0"
+grpc_port = 9090
+request_timeout_secs = 30
+max_body_size = 10485760  # 10MB
+cors_enabled = true
+cors_origins = ["*"]
+
+[deployment]
+mode = "monolithic"
+layer = "all"
+protocol = "http"
+
+[database]
+url = "postgres://arcana:arcana@localhost:5432/arcana"
+min_connections = 5
+max_connections = 20
+connect_timeout_secs = 30
+idle_timeout_secs = 600
+log_queries = false
+
+[redis]
+url = "redis://localhost:6379"
+pool_size = 10
+enabled = true
+
+[security]
+jwt_secret = "change-me-in-production"
+jwt_access_expiration_secs = 3600       # 1 hour
+jwt_refresh_expiration_secs = 604800    # 7 days
+jwt_issuer = "arcana-cloud"
+jwt_audience = "arcana-api"
+grpc_tls_enabled = false
+password_hash_cost = 12
+
+[plugins]
+enabled = true
+directory = "./plugins"
+hot_reload = true
+execution_timeout_secs = 30
+max_memory_bytes = 67108864  # 64MB
+verify_signatures = false     # Disabled for development
+
+[ssr]
+enabled = true
+runtime_pool_size = 4
+cache_enabled = true
+cache_ttl_secs = 300
+render_timeout_ms = 5000
+
+[observability]
+log_level = "debug"
+log_format = "pretty"
+metrics_enabled = true
+metrics_path = "/metrics"
+tracing_enabled = true

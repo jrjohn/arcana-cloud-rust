@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package arcana.common;
+
+option java_multiple_files = true;
+option java_package = "com.arcana.cloud.grpc.common";
+
+// Empty message for requests with no parameters
+message Empty {}
+
+// Pagination request
+message PageRequest {
+  int32 page = 1;
+  int32 size = 2;
+}
+
+// Pagination info
+message PageInfo {
+  int32 page = 1;
+  int32 size = 2;
+  int64 total_elements = 3;
+  int64 total_pages = 4;
+  bool first = 5;
+  bool last = 6;
+}
+
+// Timestamp message
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+// UUID message
+message UUID {
+  string value = 1;
+}
+
+// Error details
+message ErrorDetail {
+  string code = 1;
+  string message = 2;
+  map<string, string> metadata = 3;
+}

@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package arcana.auth;
+
+import "common.proto";
+import "user_service.proto";
+
+option java_multiple_files = true;
+option java_package = "com.arcana.cloud.grpc.auth";
+
+// Authentication service definition
+service AuthService {
+  // Register a new user
+  rpc Register(RegisterRequest) returns (AuthResponse);
+
+  // Login with credentials
+  rpc Login(LoginRequest) returns (AuthResponse);
+
+  // Refresh access token
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
+
+  // Validate a token
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // Logout
+  rpc Logout(LogoutRequest) returns (arcana.common.Empty);
+
+  // Get current user
+  rpc GetCurrentUser(arcana.common.Empty) returns (CurrentUserResponse);
+}
+
+// Register request
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  optional string first_name = 4;
+  optional string last_name = 5;
+}
+
+// Login request
+message LoginRequest {
+  string username_or_email = 1;
+  string password = 2;
+  optional string device_id = 3;
+}
+
+// Refresh token request
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Auth response
+message AuthResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  int64 expires_in = 4;
+  AuthUserInfo user = 5;
+}
+
+// User info in auth response
+message AuthUserInfo {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  arcana.user.UserRole role = 4;
+  optional string first_name = 5;
+  optional string last_name = 6;
+}
+
+// Validate token request
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+// Validate token response
+message ValidateTokenResponse {
+  bool valid = 1;
+  optional string user_id = 2;
+  optional string username = 3;
+  optional arcana.user.UserRole role = 4;
+  optional int64 expires_at = 5;
+}
+
+// Logout request
+message LogoutRequest {
+  bool all_sessions = 1;
+}
+
+// Current user response
+message CurrentUserResponse {
+  AuthUserInfo user = 1;
+}

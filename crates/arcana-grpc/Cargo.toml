@@ -1,0 +1,33 @@
+[package]
+name = "arcana-grpc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "gRPC service layer using Tonic for Arcana Cloud Rust"
+build = "build.rs"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-domain.workspace = true
+arcana-config.workspace = true
+arcana-repository.workspace = true
+arcana-security.workspace = true
+arcana-service.workspace = true
+tonic.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+serde = { workspace = true }
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tokio-stream = "0.1"
+async-trait.workspace = true
+reqwest = { version = "0.12", features = ["json"] }
+
+[build-dependencies]
+tonic-build.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

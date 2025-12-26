@@ -1,0 +1,46 @@
+# Arcana Cloud Rust - Pod Disruption Budgets
+# Ensures high availability during maintenance and upgrades
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcana-controller-pdb
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-controller
+    app.kubernetes.io/part-of: arcana
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-controller
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcana-service-pdb
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-service
+    app.kubernetes.io/part-of: arcana
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-service
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcana-repository-pdb
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-repository
+    app.kubernetes.io/part-of: arcana
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-repository

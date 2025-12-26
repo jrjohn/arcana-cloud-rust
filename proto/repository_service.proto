@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package arcana.repository;
+
+import "common.proto";
+import "user_service.proto";
+
+option java_multiple_files = true;
+option java_package = "com.arcana.cloud.grpc.repository";
+
+// Repository service for data access layer
+// This service is used for inter-layer communication in distributed deployments
+service RepositoryService {
+  // Find user by ID
+  rpc FindUserById(FindUserByIdRequest) returns (UserResult);
+
+  // Find user by username
+  rpc FindUserByUsername(FindUserByUsernameRequest) returns (UserResult);
+
+  // Find user by email
+  rpc FindUserByEmail(FindUserByEmailRequest) returns (UserResult);
+
+  // Find user by username or email
+  rpc FindUserByUsernameOrEmail(FindUserByUsernameOrEmailRequest) returns (UserResult);
+
+  // Check if username exists
+  rpc ExistsByUsername(ExistsByUsernameRequest) returns (ExistsResult);
+
+  // Check if email exists
+  rpc ExistsByEmail(ExistsByEmailRequest) returns (ExistsResult);
+
+  // Find all users with pagination
+  rpc FindAllUsers(FindAllUsersRequest) returns (UserListResult);
+
+  // Find users by role
+  rpc FindUsersByRole(FindUsersByRoleRequest) returns (UserListResult);
+
+  // Save a new user
+  rpc SaveUser(SaveUserRequest) returns (UserResult);
+
+  // Update an existing user
+  rpc UpdateUser(UpdateUserDataRequest) returns (UserResult);
+
+  // Delete a user
+  rpc DeleteUser(DeleteUserDataRequest) returns (DeleteResult);
+
+  // Count all users
+  rpc CountUsers(CountUsersRequest) returns (CountResult);
+
+  // Count users by role
+  rpc CountUsersByRole(CountUsersByRoleRequest) returns (CountResult);
+}
+
+// User data for repository operations (includes password hash)
+message UserData {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string password_hash = 4;
+  optional string first_name = 5;
+  optional string last_name = 6;
+  arcana.user.UserRole role = 7;
+  arcana.user.UserStatus status = 8;
+  bool email_verified = 9;
+  optional string avatar_url = 10;
+  optional arcana.common.Timestamp last_login_at = 11;
+  arcana.common.Timestamp created_at = 12;
+  arcana.common.Timestamp updated_at = 13;
+}
+
+message FindUserByIdRequest {
+  string user_id = 1;
+}
+
+message FindUserByUsernameRequest {
+  string username = 1;
+}
+
+message FindUserByEmailRequest {
+  string email = 1;
+}
+
+message FindUserByUsernameOrEmailRequest {
+  string identifier = 1;
+}
+
+message ExistsByUsernameRequest {
+  string username = 1;
+}
+
+message ExistsByEmailRequest {
+  string email = 1;
+}
+
+message FindAllUsersRequest {
+  arcana.common.PageRequest page = 1;
+}
+
+message FindUsersByRoleRequest {
+  arcana.user.UserRole role = 1;
+  arcana.common.PageRequest page = 2;
+}
+
+message SaveUserRequest {
+  UserData user = 1;
+}
+
+message UpdateUserDataRequest {
+  UserData user = 1;
+}
+
+message DeleteUserDataRequest {
+  string user_id = 1;
+}
+
+message CountUsersRequest {}
+
+message CountUsersByRoleRequest {
+  arcana.user.UserRole role = 1;
+}
+
+// Result messages
+message UserResult {
+  optional UserData user = 1;
+}
+
+message UserListResult {
+  repeated UserData users = 1;
+  arcana.common.PageInfo page_info = 2;
+}
+
+message ExistsResult {
+  bool exists = 1;
+}
+
+message DeleteResult {
+  bool deleted = 1;
+}
+
+message CountResult {
+  uint64 count = 1;
+}

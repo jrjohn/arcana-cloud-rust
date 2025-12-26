@@ -1,0 +1,36 @@
+# Arcana Cloud Rust - Production Configuration
+
+[app]
+environment = "production"
+
+[server]
+cors_enabled = true
+cors_origins = []  # Configure allowed origins
+
+[database]
+# This URL will be overridden by ARCANA_DATABASE__URL env var in k8s
+# Using mysql://mysql:3306 format for k8s service discovery
+url = "mysql://arcana:arcana_password@mysql:3306/arcana"
+min_connections = 10
+max_connections = 50
+log_queries = false
+
+[security]
+# jwt_secret should be set via environment variable ARCANA__SECURITY__JWT_SECRET
+grpc_tls_enabled = true
+password_hash_cost = 14
+
+[plugins]
+hot_reload = false
+verify_signatures = true
+
+[ssr]
+runtime_pool_size = 8
+cache_enabled = true
+cache_ttl_secs = 600
+
+[observability]
+log_level = "info"
+log_format = "json"
+metrics_enabled = true
+tracing_enabled = true

@@ -1,0 +1,31 @@
+[package]
+name = "arcana-rest"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "REST API layer using Axum for Arcana Cloud Rust"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-domain.workspace = true
+arcana-config.workspace = true
+arcana-security.workspace = true
+arcana-service.workspace = true
+axum = { workspace = true }
+axum-extra.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+hyper.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+async-trait.workspace = true
+shaku.workspace = true
+shaku_axum.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

@@ -1,0 +1,24 @@
+[package]
+name = "arcana-repository"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Repository implementations for Arcana Cloud Rust using SQLx"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-domain.workspace = true
+arcana-config.workspace = true
+sqlx.workspace = true
+async-trait.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+shaku.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

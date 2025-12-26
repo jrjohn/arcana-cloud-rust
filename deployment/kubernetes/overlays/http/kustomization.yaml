@@ -1,0 +1,154 @@
+# Arcana Cloud Rust - HTTP/JSON Protocol Overlay
+# Deploy with: kubectl apply -k deployment/kubernetes/overlays/http/
+#
+# This overlay configures HTTP/JSON for inter-service communication.
+# Use this for:
+# - External API compatibility
+# - Easier debugging (human-readable payloads)
+# - Simpler tooling (curl, Postman, etc.)
+#
+# Trade-offs vs gRPC:
+# - ~2x higher latency (~3.2ms vs ~1.5ms)
+# - ~2x lower throughput (~8k vs ~15k rps)
+# - ~60% larger payload size
+# - No streaming support
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: arcana-http
+
+resources:
+  - ../../
+
+namePrefix: http-
+
+commonLabels:
+  environment: http-benchmark
+  protocol: http
+
+images:
+  - name: arcana-cloud-rust
+    newName: arcana-cloud-rust
+    newTag: latest
+
+replicas:
+  - name: arcana-controller
+    count: 3
+  - name: arcana-service
+    count: 2
+  - name: arcana-repository
+    count: 2
+
+patches:
+  # Configure Controller layer for HTTP to Service
+  - target:
+      kind: Deployment
+      name: arcana-controller
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARCANA_DEPLOYMENT__MODE
+            value: "layeredhttp"
+          - name: ARCANA_DEPLOYMENT__LAYER
+            value: "controller"
+          - name: ARCANA_DEPLOYMENT__SERVICE_URL
+            value: "http://http-arcana-service:8080"
+          - name: ARCANA_SERVER__REST__HOST
+            value: "0.0.0.0"
+          - name: ARCANA_SERVER__REST__PORT
+            value: "8080"
+          - name: RUST_LOG
+            value: "info,arcana=debug"
+          - name: ARCANA_APP__ENVIRONMENT
+            value: "production"
+
+  # Configure Service layer for HTTP to Repository
+  - target:
+      kind: Deployment
+      name: arcana-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARCANA_DEPLOYMENT__MODE
+            value: "layeredhttp"
+          - name: ARCANA_DEPLOYMENT__LAYER
+            value: "service"
+          - name: ARCANA_DEPLOYMENT__REPOSITORY_URL
+            value: "http://http-arcana-repository:8080"
+          - name: ARCANA_SERVER__REST__HOST
+            value: "0.0.0.0"
+          - name: ARCANA_SERVER__REST__PORT
+            value: "8080"
+          - name: RUST_LOG
+            value: "info,arcana=debug"
+          - name: ARCANA_APP__ENVIRONMENT
+            value: "production"
+
+  # Configure Repository layer with HTTP and direct DB access
+  - target:
+      kind: Deployment
+      name: arcana-repository
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARCANA_DEPLOYMENT__MODE
+            value: "layeredhttp"
+          - name: ARCANA_DEPLOYMENT__LAYER
+            value: "repository"
+          - name: ARCANA_SERVER__REST__HOST
+            value: "0.0.0.0"
+          - name: ARCANA_SERVER__REST__PORT
+            value: "8080"
+          - name: ARCANA_DATABASE__URL
+            valueFrom:
+              secretKeyRef:
+                name: http-arcana-secrets
+                key: database-url
+          - name: RUST_LOG
+            value: "info,arcana=debug"
+          - name: ARCANA_APP__ENVIRONMENT
+            value: "production"
+
+  # Update service ports for HTTP
+  - target:
+      kind: Service
+      name: arcana-service
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/port
+        value: 8080
+      - op: replace
+        path: /spec/ports/0/targetPort
+        value: 8080
+
+  - target:
+      kind: Service
+      name: arcana-repository
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/port
+        value: 8080
+      - op: replace
+        path: /spec/ports/0/targetPort
+        value: 8080
+
+  # Update ingress host
+  - target:
+      kind: Ingress
+      name: arcana-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api-http.arcana.local
+
+# HTTP-specific config
+configMapGenerator:
+  - name: arcana-config
+    behavior: merge
+    literals:
+      - ARCANA_PROTOCOL=http
+      - ARCANA_OBSERVABILITY__METRICS_ENABLED=true

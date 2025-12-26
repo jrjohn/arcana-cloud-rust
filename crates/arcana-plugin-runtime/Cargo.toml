@@ -1,0 +1,21 @@
+[package]
+name = "arcana-plugin-runtime"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Plugin runtime for Arcana Cloud Rust - Wasmtime-based plugin execution"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-config.workspace = true
+arcana-plugin-api = { workspace = true, features = ["host"] }
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tracing.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

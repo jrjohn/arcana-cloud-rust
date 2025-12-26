@@ -1,0 +1,143 @@
+# Arcana Cloud Rust - Layered Deployment with Docker Compose
+#
+# Architecture:
+#   Client -> Controller (REST) -> Service (gRPC) -> Repository (gRPC) -> Database
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose logs -f
+#   docker-compose down
+#
+# Each layer communicates with the next layer via gRPC:
+#   - Controller exposes REST API (port 8080) and calls Service layer via gRPC
+#   - Service exposes gRPC (port 9090) and calls Repository layer via gRPC
+#   - Repository exposes gRPC (port 9090) and connects to MySQL database
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: arcana-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-arcana_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-arcana}
+      MYSQL_USER: ${MYSQL_USER:-arcana}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-arcana}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - arcana-network
+
+  # Repository Layer - Database access via gRPC
+  repository:
+    build:
+      context: ../..
+      dockerfile: deployment/layered/Dockerfile
+      args:
+        LAYER: repository
+    container_name: arcana-repository
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info,arcana=debug
+      ARCANA_APP__ENVIRONMENT: production
+      ARCANA_DEPLOYMENT__MODE: layeredgrpc
+      ARCANA_DEPLOYMENT__LAYER: repository
+      ARCANA_SERVER__GRPC_HOST: 0.0.0.0
+      ARCANA_SERVER__GRPC_PORT: 9090
+      ARCANA_DATABASE__URL: mysql://${MYSQL_USER:-arcana}:${MYSQL_PASSWORD:-arcana}@mysql:3306/${MYSQL_DATABASE:-arcana}
+    ports:
+      - "9091:9090"
+    networks:
+      - arcana-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/grpc.health.v1.Health/Check"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Service Layer - Business logic via gRPC
+  service:
+    build:
+      context: ../..
+      dockerfile: deployment/layered/Dockerfile
+      args:
+        LAYER: service
+    container_name: arcana-service
+    depends_on:
+      repository:
+        condition: service_started
+    environment:
+      RUST_LOG: info,arcana=debug
+      ARCANA_APP__ENVIRONMENT: production
+      ARCANA_DEPLOYMENT__MODE: layeredgrpc
+      ARCANA_DEPLOYMENT__LAYER: service
+      ARCANA_SERVER__GRPC_HOST: 0.0.0.0
+      ARCANA_SERVER__GRPC_PORT: 9090
+      ARCANA_DEPLOYMENT__REPOSITORY_URL: http://repository:9090
+      # Security configuration
+      ARCANA_SECURITY__JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ARCANA_SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA_SECURITY__JWT_AUDIENCE: arcana-api
+      ARCANA_SECURITY__PASSWORD_HASH_COST: 12
+    ports:
+      - "9092:9090"
+    networks:
+      - arcana-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/grpc.health.v1.Health/Check"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Controller Layer - REST API
+  controller:
+    build:
+      context: ../..
+      dockerfile: deployment/layered/Dockerfile
+      args:
+        LAYER: controller
+    container_name: arcana-controller
+    depends_on:
+      service:
+        condition: service_started
+    environment:
+      RUST_LOG: info,arcana=debug
+      ARCANA_APP__ENVIRONMENT: production
+      ARCANA_DEPLOYMENT__MODE: layeredgrpc
+      ARCANA_DEPLOYMENT__LAYER: controller
+      ARCANA_SERVER__REST_HOST: 0.0.0.0
+      ARCANA_SERVER__REST_PORT: 8080
+      ARCANA_DEPLOYMENT__SERVICE_URL: http://service:9090
+      # Security configuration for JWT validation
+      ARCANA_SECURITY__JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ARCANA_SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA_SECURITY__JWT_AUDIENCE: arcana-api
+    ports:
+      - "8080:8080"
+    networks:
+      - arcana-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  arcana-network:
+    driver: bridge
+
+volumes:
+  mysql_data:

@@ -1,0 +1,37 @@
+[package]
+name = "arcana-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Main server application for Arcana Cloud Rust"
+
+[[bin]]
+name = "arcana-server"
+path = "src/main.rs"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-domain.workspace = true
+arcana-config.workspace = true
+arcana-repository.workspace = true
+arcana-security.workspace = true
+arcana-service.workspace = true
+arcana-rest.workspace = true
+arcana-grpc.workspace = true
+arcana-resilience.workspace = true
+axum.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+shaku.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+criterion.workspace = true
+
+[[bench]]
+name = "protocol_benchmark"
+harness = false

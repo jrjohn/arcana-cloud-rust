@@ -1,0 +1,136 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/arcana-core",
+    "crates/arcana-domain",
+    "crates/arcana-repository",
+    "crates/arcana-service",
+    "crates/arcana-rest",
+    "crates/arcana-grpc",
+    "crates/arcana-security",
+    "crates/arcana-config",
+    "crates/arcana-plugin-api",
+    "crates/arcana-plugin-runtime",
+    "crates/arcana-ssr-engine",
+    "crates/arcana-resilience",
+    "crates/arcana-server",
+    "plugins/arcana-audit-plugin",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Arcana Team"]
+license = "MIT"
+repository = "https://github.com/arcana/arcana-cloud-rust"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
+
+# Web framework (Axum)
+axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
+axum-extra = { version = "0.9", features = ["typed-header", "cookie"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "request-id"] }
+hyper = { version = "1.5", features = ["full"] }
+hyper-util = { version = "0.1" }
+
+# gRPC (Tonic)
+tonic = { version = "0.12", features = ["tls", "tls-roots"] }
+tonic-build = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+
+# Database (SQLx)
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "mysql", "sqlite", "uuid", "chrono", "json"] }
+
+# Redis
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# Security
+jsonwebtoken = "9.3"
+argon2 = "0.5"
+uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
+
+# WASM Plugin Runtime
+wasmtime = { version = "27", features = ["component-model"] }
+wasmtime-wasi = "27"
+
+# Resilience
+governor = "0.7"
+backoff = { version = "0.4", features = ["tokio"] }
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Validation
+validator = { version = "0.19", features = ["derive"] }
+
+# Async traits
+async-trait = "0.1"
+
+# Dependency Injection
+shaku = { version = "0.6", features = ["derive"] }
+shaku_axum = "0.3"
+
+# Futures
+futures = "0.3"
+
+# Testing
+mockall = "0.13"
+wiremock = "0.6"
+testcontainers = "0.23"
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+# Internal crates
+arcana-core = { path = "crates/arcana-core" }
+arcana-domain = { path = "crates/arcana-domain" }
+arcana-repository = { path = "crates/arcana-repository" }
+arcana-service = { path = "crates/arcana-service" }
+arcana-rest = { path = "crates/arcana-rest" }
+arcana-grpc = { path = "crates/arcana-grpc" }
+arcana-security = { path = "crates/arcana-security" }
+arcana-config = { path = "crates/arcana-config" }
+arcana-plugin-api = { path = "crates/arcana-plugin-api" }
+arcana-plugin-runtime = { path = "crates/arcana-plugin-runtime" }
+arcana-ssr-engine = { path = "crates/arcana-ssr-engine" }
+arcana-resilience = { path = "crates/arcana-resilience" }
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

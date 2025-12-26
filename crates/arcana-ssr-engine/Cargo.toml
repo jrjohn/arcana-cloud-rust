@@ -1,0 +1,18 @@
+[package]
+name = "arcana-ssr-engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Server-side rendering engine for Arcana Cloud Rust"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-config.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tracing.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

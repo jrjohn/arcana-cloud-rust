@@ -1,0 +1,47 @@
+# Arcana Cloud Rust - Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arcana-config
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-cloud
+    app.kubernetes.io/part-of: arcana
+data:
+  # Application settings
+  RUST_LOG: "info,arcana=debug"
+  ARCANA_APP__ENVIRONMENT: "production"
+  # Use monolithic mode for benchmark testing
+  ARCANA_DEPLOYMENT_MODE: "monolithic"
+  ARCANA_ENVIRONMENT: "production"
+  # Double underscore for config override
+  ARCANA_DEPLOYMENT__MODE: "monolithic"
+  ARCANA_DEPLOYMENT__LAYER: "all"
+
+  # Server settings (nested config uses double underscore)
+  ARCANA_SERVER__REST__HOST: "0.0.0.0"
+  ARCANA_SERVER__REST__PORT: "8080"
+  ARCANA_SERVER__GRPC__HOST: "0.0.0.0"
+  ARCANA_SERVER__GRPC__PORT: "9090"
+  ARCANA_SERVER__REQUEST_TIMEOUT_SECS: "30"
+
+  # Security settings (non-sensitive)
+  ARCANA_SECURITY__JWT_ISSUER: "arcana-cloud"
+  ARCANA_SECURITY__JWT_AUDIENCE: "arcana-api"
+  ARCANA_SECURITY__JWT_ACCESS_EXPIRATION_SECS: "3600"
+  ARCANA_SECURITY__JWT_REFRESH_EXPIRATION_SECS: "604800"
+  ARCANA_SECURITY__PASSWORD_HASH_COST: "12"
+
+  # Database settings (non-sensitive)
+  ARCANA_DATABASE__MIN_CONNECTIONS: "5"
+  ARCANA_DATABASE__MAX_CONNECTIONS: "20"
+  ARCANA_DATABASE__CONNECT_TIMEOUT_SECS: "30"
+  ARCANA_DATABASE__IDLE_TIMEOUT_SECS: "600"
+  ARCANA_DATABASE__LOG_QUERIES: "false"
+
+  # Observability
+  ARCANA_OBSERVABILITY__LOG_LEVEL: "info"
+  ARCANA_OBSERVABILITY__LOG_FORMAT: "json"
+  ARCANA_OBSERVABILITY__METRICS_ENABLED: "true"
+  ARCANA_OBSERVABILITY__METRICS_PATH: "/metrics"
+  ARCANA_OBSERVABILITY__TRACING_ENABLED: "true"

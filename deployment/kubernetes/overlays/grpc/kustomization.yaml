@@ -1,0 +1,127 @@
+# Arcana Cloud Rust - gRPC Protocol Overlay
+# Deploy with: kubectl apply -k deployment/kubernetes/overlays/grpc/
+#
+# This overlay configures gRPC (Protocol Buffers) for inter-service communication.
+# Recommended for production deployments due to:
+# - 2x lower latency (~1.5ms vs ~3.2ms)
+# - 2x higher throughput (~15k vs ~8k rps)
+# - 60% smaller payload size
+# - Bi-directional streaming support
+# - Strong typing via proto definitions
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: arcana-grpc
+
+resources:
+  - ../../
+
+namePrefix: grpc-
+
+commonLabels:
+  environment: grpc-benchmark
+  protocol: grpc
+
+images:
+  - name: arcana-cloud-rust
+    newName: arcana-cloud-rust
+    newTag: latest
+
+replicas:
+  - name: arcana-controller
+    count: 3
+  - name: arcana-service
+    count: 2
+  - name: arcana-repository
+    count: 2
+
+patches:
+  # Configure Controller layer for gRPC to Service
+  - target:
+      kind: Deployment
+      name: arcana-controller
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARCANA_DEPLOYMENT__MODE
+            value: "layeredgrpc"
+          - name: ARCANA_DEPLOYMENT__LAYER
+            value: "controller"
+          - name: ARCANA_DEPLOYMENT__SERVICE_URL
+            value: "http://grpc-arcana-service:9090"
+          - name: ARCANA_SERVER__REST__HOST
+            value: "0.0.0.0"
+          - name: ARCANA_SERVER__REST__PORT
+            value: "8080"
+          - name: RUST_LOG
+            value: "info,arcana=debug"
+          - name: ARCANA_APP__ENVIRONMENT
+            value: "production"
+
+  # Configure Service layer for gRPC to Repository
+  - target:
+      kind: Deployment
+      name: arcana-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARCANA_DEPLOYMENT__MODE
+            value: "layeredgrpc"
+          - name: ARCANA_DEPLOYMENT__LAYER
+            value: "service"
+          - name: ARCANA_DEPLOYMENT__REPOSITORY_URL
+            value: "http://grpc-arcana-repository:9090"
+          - name: ARCANA_SERVER__GRPC__HOST
+            value: "0.0.0.0"
+          - name: ARCANA_SERVER__GRPC__PORT
+            value: "9090"
+          - name: RUST_LOG
+            value: "info,arcana=debug"
+          - name: ARCANA_APP__ENVIRONMENT
+            value: "production"
+
+  # Configure Repository layer with direct DB access
+  - target:
+      kind: Deployment
+      name: arcana-repository
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARCANA_DEPLOYMENT__MODE
+            value: "layeredgrpc"
+          - name: ARCANA_DEPLOYMENT__LAYER
+            value: "repository"
+          - name: ARCANA_SERVER__GRPC__HOST
+            value: "0.0.0.0"
+          - name: ARCANA_SERVER__GRPC__PORT
+            value: "9090"
+          - name: ARCANA_DATABASE__URL
+            valueFrom:
+              secretKeyRef:
+                name: grpc-arcana-secrets
+                key: database-url
+          - name: RUST_LOG
+            value: "info,arcana=debug"
+          - name: ARCANA_APP__ENVIRONMENT
+            value: "production"
+
+  # Update ingress host
+  - target:
+      kind: Ingress
+      name: arcana-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api-grpc.arcana.local
+
+# gRPC-specific config
+configMapGenerator:
+  - name: arcana-config
+    behavior: merge
+    literals:
+      - ARCANA_PROTOCOL=grpc
+      - ARCANA_OBSERVABILITY__METRICS_ENABLED=true

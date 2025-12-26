@@ -1,0 +1,135 @@
+# Arcana Cloud Rust - Controller Layer Deployment
+# REST API layer, calls Service via gRPC, exposes HTTP endpoints
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arcana-controller
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: arcana
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: arcana-controller
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/part-of: arcana
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: arcana-service-account
+      containers:
+        - name: controller
+          image: arcana-cloud-rust:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ARCANA_DEPLOYMENT__LAYER
+              value: "controller"
+            - name: ARCANA_DEPLOYMENT__SERVICE_URL
+              value: "http://arcana-service:9090"
+          envFrom:
+            - configMapRef:
+                name: arcana-config
+            - secretRef:
+                name: arcana-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: arcana-controller
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcana-controller
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: arcana
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: arcana-controller
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+---
+# Horizontal Pod Autoscaler for Controller Layer
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: arcana-controller-hpa
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-controller
+    app.kubernetes.io/part-of: arcana
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: arcana-controller
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

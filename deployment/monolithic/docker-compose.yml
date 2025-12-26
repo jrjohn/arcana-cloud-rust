@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  arcana-server:
+    build:
+      context: ../..
+      dockerfile: deployment/monolithic/Dockerfile
+    container_name: arcana-server
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - RUST_LOG=info,arcana=debug
+      - ARCANA_ENVIRONMENT=production
+      - ARCANA_DEPLOYMENT_MODE=monolithic
+      - ARCANA__DATABASE__URL=mysql://arcana:arcana@mysql:3306/arcana
+      - ARCANA__REDIS__URL=redis://redis:6379
+      - ARCANA__SECURITY__JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - arcana-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: arcana-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_USER=arcana
+      - MYSQL_PASSWORD=arcana
+      - MYSQL_DATABASE=arcana
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "arcana", "-parcana"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - arcana-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: arcana-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - arcana-network
+
+networks:
+  arcana-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:

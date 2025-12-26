@@ -1,0 +1,26 @@
+[package]
+name = "arcana-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core types, traits, and error definitions for Arcana Cloud Rust"
+
+[dependencies]
+thiserror.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+sqlx = { workspace = true, optional = true }
+validator.workspace = true
+shaku.workspace = true
+
+[features]
+default = ["sqlx"]
+sqlx = ["dep:sqlx"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

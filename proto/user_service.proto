@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package arcana.user;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.arcana.cloud.grpc.user";
+
+// User service definition
+service UserService {
+  // Get a user by ID
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+
+  // Get a user by username
+  rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse);
+
+  // List all users with pagination
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+
+  // Create a new user
+  rpc CreateUser(CreateUserRequest) returns (UserResponse);
+
+  // Update a user
+  rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+
+  // Delete a user
+  rpc DeleteUser(DeleteUserRequest) returns (arcana.common.Empty);
+
+  // Update user role
+  rpc UpdateUserRole(UpdateUserRoleRequest) returns (UserResponse);
+
+  // Update user status
+  rpc UpdateUserStatus(UpdateUserStatusRequest) returns (UserResponse);
+
+  // Check if username exists
+  rpc UsernameExists(UsernameExistsRequest) returns (ExistsResponse);
+
+  // Check if email exists
+  rpc EmailExists(EmailExistsRequest) returns (ExistsResponse);
+}
+
+// User role enum
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_USER = 1;
+  USER_ROLE_MODERATOR = 2;
+  USER_ROLE_ADMIN = 3;
+  USER_ROLE_SUPER_ADMIN = 4;
+}
+
+// User status enum
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_PENDING_VERIFICATION = 1;
+  USER_STATUS_ACTIVE = 2;
+  USER_STATUS_SUSPENDED = 3;
+  USER_STATUS_LOCKED = 4;
+  USER_STATUS_DELETED = 5;
+}
+
+// User message
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  optional string first_name = 4;
+  optional string last_name = 5;
+  UserRole role = 6;
+  UserStatus status = 7;
+  bool email_verified = 8;
+  optional string avatar_url = 9;
+  optional arcana.common.Timestamp last_login_at = 10;
+  arcana.common.Timestamp created_at = 11;
+  arcana.common.Timestamp updated_at = 12;
+}
+
+// Get user request
+message GetUserRequest {
+  string user_id = 1;
+}
+
+// Get user by username request
+message GetUserByUsernameRequest {
+  string username = 1;
+}
+
+// List users request
+message ListUsersRequest {
+  arcana.common.PageRequest page = 1;
+  optional UserRole role_filter = 2;
+}
+
+// List users response
+message ListUsersResponse {
+  repeated User users = 1;
+  arcana.common.PageInfo page_info = 2;
+}
+
+// Create user request
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  optional string first_name = 4;
+  optional string last_name = 5;
+}
+
+// Update user request
+message UpdateUserRequest {
+  string user_id = 1;
+  optional string first_name = 2;
+  optional string last_name = 3;
+  optional string avatar_url = 4;
+}
+
+// Delete user request
+message DeleteUserRequest {
+  string user_id = 1;
+}
+
+// Update user role request
+message UpdateUserRoleRequest {
+  string user_id = 1;
+  UserRole role = 2;
+}
+
+// Update user status request
+message UpdateUserStatusRequest {
+  string user_id = 1;
+  UserStatus status = 2;
+  optional string reason = 3;
+}
+
+// Username exists request
+message UsernameExistsRequest {
+  string username = 1;
+}
+
+// Email exists request
+message EmailExistsRequest {
+  string email = 1;
+}
+
+// Exists response
+message ExistsResponse {
+  bool exists = 1;
+}
+
+// User response (single user)
+message UserResponse {
+  User user = 1;
+}

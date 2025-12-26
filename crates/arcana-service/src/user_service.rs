@@ -1,0 +1,675 @@
+//! User service implementation.
+
+use crate::dto::{
+    ChangePasswordRequest, CreateUserRequest, UpdateUserRequest, UpdateUserRoleRequest,
+    UpdateUserStatusRequest, UserListResponse, UserResponse,
+};
+use arcana_core::{ArcanaError, ArcanaResult, Interface, Page, PageRequest, UserId, ValidateExt};
+use arcana_domain::{Email, User, UserRole};
+use arcana_repository::UserRepository;
+use arcana_security::PasswordHasher;
+use async_trait::async_trait;
+use std::sync::Arc;
+use tracing::{debug, info};
+
+/// User service trait.
+#[async_trait]
+pub trait UserService: Interface + Send + Sync {
+    /// Creates a new user.
+    async fn create_user(&self, request: CreateUserRequest) -> ArcanaResult<UserResponse>;
+
+    /// Gets a user by ID.
+    async fn get_user(&self, id: UserId) -> ArcanaResult<UserResponse>;
+
+    /// Gets a user by username.
+    async fn get_user_by_username(&self, username: &str) -> ArcanaResult<UserResponse>;
+
+    /// Lists all users with pagination.
+    async fn list_users(&self, page: PageRequest) -> ArcanaResult<UserListResponse>;
+
+    /// Updates a user's profile.
+    async fn update_user(&self, id: UserId, request: UpdateUserRequest) -> ArcanaResult<UserResponse>;
+
+    /// Updates a user's role.
+    async fn update_user_role(&self, id: UserId, request: UpdateUserRoleRequest) -> ArcanaResult<UserResponse>;
+
+    /// Updates a user's status.
+    async fn update_user_status(&self, id: UserId, request: UpdateUserStatusRequest) -> ArcanaResult<UserResponse>;
+
+    /// Changes a user's password.
+    async fn change_password(&self, id: UserId, request: ChangePasswordRequest) -> ArcanaResult<()>;
+
+    /// Deletes a user.
+    async fn delete_user(&self, id: UserId) -> ArcanaResult<()>;
+
+    /// Checks if a username exists.
+    async fn username_exists(&self, username: &str) -> ArcanaResult<bool>;
+
+    /// Checks if an email exists.
+    async fn email_exists(&self, email: &str) -> ArcanaResult<bool>;
+}
+
+/// User service implementation.
+pub struct UserServiceImpl<R: UserRepository> {
+    user_repository: Arc<R>,
+    password_hasher: Arc<PasswordHasher>,
+}
+
+impl<R: UserRepository> UserServiceImpl<R> {
+    /// Creates a new user service.
+    pub fn new(user_repository: Arc<R>, password_hasher: Arc<PasswordHasher>) -> Self {
+        Self {
+            user_repository,
+            password_hasher,
+        }
+    }
+}
+
+#[async_trait]
+impl<R: UserRepository + 'static> UserService for UserServiceImpl<R> {
+    async fn create_user(&self, request: CreateUserRequest) -> ArcanaResult<UserResponse> {
+        debug!("Creating user: {}", request.username);
+
+        // Validate request
+        request.validate_request()?;
+
+        // Check for existing username
+        if self.user_repository.exists_by_username(&request.username).await? {
+            return Err(ArcanaError::Conflict(format!(
+                "Username '{}' already exists",
+                request.username
+            )));
+        }
+
+        // Check for existing email
+        if self.user_repository.exists_by_email(&request.email).await? {
+            return Err(ArcanaError::Conflict(format!(
+                "Email '{}' already exists",
+                request.email
+            )));
+        }
+
+        // Parse and validate email
+        let email = Email::new(&request.email)
+            .map_err(|e| ArcanaError::Validation(e.to_string()))?;
+
+        // Hash password
+        let password_hash = self.password_hasher.hash(&request.password)?;
+
+        // Create user entity
+        let user = User::new(
+            request.username,
+            email,
+            password_hash,
+            request.first_name,
+            request.last_name,
+        );
+
+        // Save user
+        let saved_user = self.user_repository.save(&user).await?;
+
+        info!("User created: {}", saved_user.id);
+        Ok(UserResponse::from(saved_user))
+    }
+
+    async fn get_user(&self, id: UserId) -> ArcanaResult<UserResponse> {
+        debug!("Getting user: {}", id);
+
+        let user = self
+            .user_repository
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", id))?;
+
+        Ok(UserResponse::from(user))
+    }
+
+    async fn get_user_by_username(&self, username: &str) -> ArcanaResult<UserResponse> {
+        debug!("Getting user by username: {}", username);
+
+        let user = self
+            .user_repository
+            .find_by_username(username)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", username))?;
+
+        Ok(UserResponse::from(user))
+    }
+
+    async fn list_users(&self, page: PageRequest) -> ArcanaResult<UserListResponse> {
+        debug!("Listing users, page: {}, size: {}", page.page, page.size);
+
+        let users = self.user_repository.find_all(page).await?;
+        Ok(UserListResponse::from(users))
+    }
+
+    async fn update_user(&self, id: UserId, request: UpdateUserRequest) -> ArcanaResult<UserResponse> {
+        debug!("Updating user: {}", id);
+
+        request.validate_request()?;
+
+        let mut user = self
+            .user_repository
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", id))?;
+
+        user.update_profile(request.first_name, request.last_name, request.avatar_url);
+
+        let updated_user = self.user_repository.update(&user).await?;
+
+        info!("User updated: {}", id);
+        Ok(UserResponse::from(updated_user))
+    }
+
+    async fn update_user_role(&self, id: UserId, request: UpdateUserRoleRequest) -> ArcanaResult<UserResponse> {
+        debug!("Updating user role: {} -> {:?}", id, request.role);
+
+        let mut user = self
+            .user_repository
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", id))?;
+
+        user.change_role(request.role);
+
+        let updated_user = self.user_repository.update(&user).await?;
+
+        info!("User role updated: {} -> {:?}", id, request.role);
+        Ok(UserResponse::from(updated_user))
+    }
+
+    async fn update_user_status(&self, id: UserId, request: UpdateUserStatusRequest) -> ArcanaResult<UserResponse> {
+        debug!("Updating user status: {} -> {:?}", id, request.status);
+
+        let mut user = self
+            .user_repository
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", id))?;
+
+        user.status = request.status;
+        user.updated_at = chrono::Utc::now();
+
+        let updated_user = self.user_repository.update(&user).await?;
+
+        info!("User status updated: {} -> {:?}", id, request.status);
+        Ok(UserResponse::from(updated_user))
+    }
+
+    async fn change_password(&self, id: UserId, request: ChangePasswordRequest) -> ArcanaResult<()> {
+        debug!("Changing password for user: {}", id);
+
+        request.validate_request()?;
+
+        let mut user = self
+            .user_repository
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", id))?;
+
+        // Verify current password
+        if !self.password_hasher.verify(&request.current_password, &user.password_hash)? {
+            return Err(ArcanaError::InvalidCredentials);
+        }
+
+        // Hash new password
+        let new_hash = self.password_hasher.hash(&request.new_password)?;
+        user.update_password(new_hash);
+
+        self.user_repository.update(&user).await?;
+
+        info!("Password changed for user: {}", id);
+        Ok(())
+    }
+
+    async fn delete_user(&self, id: UserId) -> ArcanaResult<()> {
+        debug!("Deleting user: {}", id);
+
+        let deleted = self.user_repository.delete(id).await?;
+
+        if !deleted {
+            return Err(ArcanaError::not_found("User", id));
+        }
+
+        info!("User deleted: {}", id);
+        Ok(())
+    }
+
+    async fn username_exists(&self, username: &str) -> ArcanaResult<bool> {
+        self.user_repository.exists_by_username(username).await
+    }
+
+    async fn email_exists(&self, email: &str) -> ArcanaResult<bool> {
+        self.user_repository.exists_by_email(email).await
+    }
+}
+
+impl<R: UserRepository> std::fmt::Debug for UserServiceImpl<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UserServiceImpl").finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arcana_core::Page;
+    use arcana_domain::{Email, User, UserRole, UserStatus};
+    use async_trait::async_trait;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    /// Mock user repository for testing.
+    struct MockUserRepository {
+        users: Mutex<HashMap<UserId, User>>,
+    }
+
+    impl MockUserRepository {
+        fn new() -> Self {
+            Self {
+                users: Mutex::new(HashMap::new()),
+            }
+        }
+
+        fn with_user(user: User) -> Self {
+            let repo = Self::new();
+            repo.users.lock().unwrap().insert(user.id, user);
+            repo
+        }
+    }
+
+    #[async_trait]
+    impl UserRepository for MockUserRepository {
+        async fn find_by_id(&self, id: UserId) -> ArcanaResult<Option<User>> {
+            Ok(self.users.lock().unwrap().get(&id).cloned())
+        }
+
+        async fn find_by_username(&self, username: &str) -> ArcanaResult<Option<User>> {
+            Ok(self.users.lock().unwrap().values()
+                .find(|u| u.username == username)
+                .cloned())
+        }
+
+        async fn find_by_email(&self, email: &str) -> ArcanaResult<Option<User>> {
+            Ok(self.users.lock().unwrap().values()
+                .find(|u| u.email.as_str() == email)
+                .cloned())
+        }
+
+        async fn find_by_username_or_email(&self, identifier: &str) -> ArcanaResult<Option<User>> {
+            Ok(self.users.lock().unwrap().values()
+                .find(|u| u.username == identifier || u.email.as_str() == identifier)
+                .cloned())
+        }
+
+        async fn exists_by_username(&self, username: &str) -> ArcanaResult<bool> {
+            Ok(self.users.lock().unwrap().values()
+                .any(|u| u.username == username))
+        }
+
+        async fn exists_by_email(&self, email: &str) -> ArcanaResult<bool> {
+            Ok(self.users.lock().unwrap().values()
+                .any(|u| u.email.as_str().to_lowercase() == email.to_lowercase()))
+        }
+
+        async fn find_all(&self, page: PageRequest) -> ArcanaResult<Page<User>> {
+            let users: Vec<User> = self.users.lock().unwrap().values().cloned().collect();
+            let total = users.len() as u64;
+            let start = page.offset();
+            let end = std::cmp::min(start + page.limit(), users.len());
+            let items = if start < users.len() {
+                users[start..end].to_vec()
+            } else {
+                vec![]
+            };
+            Ok(Page::new(items, page.page, page.size, total))
+        }
+
+        async fn find_by_role(&self, role: UserRole, page: PageRequest) -> ArcanaResult<Page<User>> {
+            let users: Vec<User> = self.users.lock().unwrap().values()
+                .filter(|u| u.role == role)
+                .cloned()
+                .collect();
+            let total = users.len() as u64;
+            let start = page.offset();
+            let end = std::cmp::min(start + page.limit(), users.len());
+            let items = if start < users.len() {
+                users[start..end].to_vec()
+            } else {
+                vec![]
+            };
+            Ok(Page::new(items, page.page, page.size, total))
+        }
+
+        async fn save(&self, user: &User) -> ArcanaResult<User> {
+            let mut users = self.users.lock().unwrap();
+            users.insert(user.id, user.clone());
+            Ok(user.clone())
+        }
+
+        async fn update(&self, user: &User) -> ArcanaResult<User> {
+            let mut users = self.users.lock().unwrap();
+            users.insert(user.id, user.clone());
+            Ok(user.clone())
+        }
+
+        async fn delete(&self, id: UserId) -> ArcanaResult<bool> {
+            let mut users = self.users.lock().unwrap();
+            Ok(users.remove(&id).is_some())
+        }
+
+        async fn count(&self) -> ArcanaResult<u64> {
+            Ok(self.users.lock().unwrap().len() as u64)
+        }
+
+        async fn count_by_role(&self, role: UserRole) -> ArcanaResult<u64> {
+            Ok(self.users.lock().unwrap().values()
+                .filter(|u| u.role == role)
+                .count() as u64)
+        }
+    }
+
+    fn create_test_user() -> User {
+        User::new(
+            "testuser".to_string(),
+            Email::new_unchecked("test@example.com".to_string()),
+            "hashed_password".to_string(),
+            Some("Test".to_string()),
+            Some("User".to_string()),
+        )
+    }
+
+    fn create_user_service(repo: MockUserRepository) -> UserServiceImpl<MockUserRepository> {
+        UserServiceImpl::new(
+            Arc::new(repo),
+            Arc::new(PasswordHasher::new()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_create_user_success() {
+        let repo = MockUserRepository::new();
+        let service = create_user_service(repo);
+
+        let request = CreateUserRequest {
+            username: "newuser".to_string(),
+            email: "new@example.com".to_string(),
+            password: "Password123".to_string(),
+            first_name: Some("New".to_string()),
+            last_name: Some("User".to_string()),
+        };
+
+        let result = service.create_user(request).await;
+        assert!(result.is_ok());
+        let user = result.unwrap();
+        assert_eq!(user.username, "newuser");
+        assert_eq!(user.email, "new@example.com");
+    }
+
+    #[tokio::test]
+    async fn test_create_user_duplicate_username() {
+        let existing_user = create_test_user();
+        let repo = MockUserRepository::with_user(existing_user);
+        let service = create_user_service(repo);
+
+        let request = CreateUserRequest {
+            username: "testuser".to_string(),
+            email: "other@example.com".to_string(),
+            password: "Password123".to_string(),
+            first_name: None,
+            last_name: None,
+        };
+
+        let result = service.create_user(request).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ArcanaError::Conflict(msg) => assert!(msg.contains("Username")),
+            _ => panic!("Expected Conflict error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_user_duplicate_email() {
+        let existing_user = create_test_user();
+        let repo = MockUserRepository::with_user(existing_user);
+        let service = create_user_service(repo);
+
+        let request = CreateUserRequest {
+            username: "otheruser".to_string(),
+            email: "test@example.com".to_string(),
+            password: "Password123".to_string(),
+            first_name: None,
+            last_name: None,
+        };
+
+        let result = service.create_user(request).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ArcanaError::Conflict(msg) => assert!(msg.contains("Email")),
+            _ => panic!("Expected Conflict error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_user_invalid_email() {
+        let repo = MockUserRepository::new();
+        let service = create_user_service(repo);
+
+        let request = CreateUserRequest {
+            username: "newuser".to_string(),
+            email: "invalid-email".to_string(),
+            password: "Password123".to_string(),
+            first_name: None,
+            last_name: None,
+        };
+
+        let result = service.create_user(request).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_success() {
+        let user = create_test_user();
+        let user_id = user.id;
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let result = service.get_user(user_id).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().id, user_id);
+    }
+
+    #[tokio::test]
+    async fn test_get_user_not_found() {
+        let repo = MockUserRepository::new();
+        let service = create_user_service(repo);
+
+        let result = service.get_user(UserId::new()).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ArcanaError::NotFound { .. } => {}
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_username_success() {
+        let user = create_test_user();
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let result = service.get_user_by_username("testuser").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().username, "testuser");
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_username_not_found() {
+        let repo = MockUserRepository::new();
+        let service = create_user_service(repo);
+
+        let result = service.get_user_by_username("nonexistent").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_list_users() {
+        let user = create_test_user();
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let result = service.list_users(PageRequest::default()).await;
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.total_elements, 1);
+        assert_eq!(response.users.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_success() {
+        let user = create_test_user();
+        let user_id = user.id;
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let request = UpdateUserRequest {
+            first_name: Some("Updated".to_string()),
+            last_name: Some("Name".to_string()),
+            avatar_url: None,
+        };
+
+        let result = service.update_user(user_id, request).await;
+        assert!(result.is_ok());
+        let updated = result.unwrap();
+        assert_eq!(updated.first_name, Some("Updated".to_string()));
+        assert_eq!(updated.last_name, Some("Name".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_update_user_not_found() {
+        let repo = MockUserRepository::new();
+        let service = create_user_service(repo);
+
+        let request = UpdateUserRequest {
+            first_name: Some("Updated".to_string()),
+            last_name: None,
+            avatar_url: None,
+        };
+
+        let result = service.update_user(UserId::new(), request).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_user_role() {
+        let user = create_test_user();
+        let user_id = user.id;
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let request = UpdateUserRoleRequest { role: UserRole::Admin };
+        let result = service.update_user_role(user_id, request).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().role, UserRole::Admin);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_status() {
+        let user = create_test_user();
+        let user_id = user.id;
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let request = UpdateUserStatusRequest {
+            status: UserStatus::Suspended,
+            reason: Some("Test suspension".to_string()),
+        };
+
+        let result = service.update_user_status(user_id, request).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().status, UserStatus::Suspended);
+    }
+
+    #[tokio::test]
+    async fn test_delete_user_success() {
+        let user = create_test_user();
+        let user_id = user.id;
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let result = service.delete_user(user_id).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_user_not_found() {
+        let repo = MockUserRepository::new();
+        let service = create_user_service(repo);
+
+        let result = service.delete_user(UserId::new()).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_username_exists() {
+        let user = create_test_user();
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        assert!(service.username_exists("testuser").await.unwrap());
+        assert!(!service.username_exists("nonexistent").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_email_exists() {
+        let user = create_test_user();
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        assert!(service.email_exists("test@example.com").await.unwrap());
+        assert!(!service.email_exists("other@example.com").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_change_password_success() {
+        let mut user = create_test_user();
+        let user_id = user.id;
+        let hasher = PasswordHasher::new();
+        user.password_hash = hasher.hash("OldPassword123").unwrap();
+
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let request = ChangePasswordRequest {
+            current_password: "OldPassword123".to_string(),
+            new_password: "NewPassword456".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_change_password_wrong_current() {
+        let mut user = create_test_user();
+        let user_id = user.id;
+        let hasher = PasswordHasher::new();
+        user.password_hash = hasher.hash("OldPassword123").unwrap();
+
+        let repo = MockUserRepository::with_user(user);
+        let service = create_user_service(repo);
+
+        let request = ChangePasswordRequest {
+            current_password: "WrongPassword".to_string(),
+            new_password: "NewPassword456".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ArcanaError::InvalidCredentials => {}
+            _ => panic!("Expected InvalidCredentials error"),
+        }
+    }
+}

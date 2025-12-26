@@ -1,0 +1,8 @@
+# Arcana Cloud Rust - Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcana
+  labels:
+    app.kubernetes.io/name: arcana-cloud
+    app.kubernetes.io/part-of: arcana

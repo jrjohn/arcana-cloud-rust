@@ -1,0 +1,111 @@
+# Arcana Cloud Rust - Network Policies
+# Restricts traffic flow between layers for security
+
+# Default deny all ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: arcana
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Allow ingress to Controller from external (via Ingress)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-controller-ingress
+  namespace: arcana
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-controller
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow health checks from within namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow Service layer to receive traffic only from Controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-service-from-controller
+  namespace: arcana
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: arcana-controller
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# Allow Repository layer to receive traffic only from Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-repository-from-service
+  namespace: arcana
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-repository
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: arcana-service
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# Allow Repository to connect to database (external)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-repository-egress-db
+  namespace: arcana
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-repository
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow MySQL (internal service or external)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 3306

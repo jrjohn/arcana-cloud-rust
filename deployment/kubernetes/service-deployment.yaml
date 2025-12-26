@@ -1,0 +1,138 @@
+# Arcana Cloud Rust - Service Layer Deployment
+# Business logic layer, calls Repository via gRPC, exposes UserService/AuthService via gRPC
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arcana-service
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-service
+    app.kubernetes.io/component: service
+    app.kubernetes.io/part-of: arcana
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: arcana-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: arcana-service
+        app.kubernetes.io/component: service
+        app.kubernetes.io/part-of: arcana
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: arcana-service-account
+      containers:
+        - name: service
+          image: arcana-cloud-rust:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 9090
+              protocol: TCP
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ARCANA_DEPLOYMENT__LAYER
+              value: "service"
+            - name: ARCANA_DEPLOYMENT__REPOSITORY_URL
+              value: "http://arcana-repository:9090"
+          envFrom:
+            - configMapRef:
+                name: arcana-config
+            - secretRef:
+                name: arcana-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: arcana-service
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcana-service
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-service
+    app.kubernetes.io/component: service
+    app.kubernetes.io/part-of: arcana
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: arcana-service
+  ports:
+    - name: grpc
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+---
+# Horizontal Pod Autoscaler for Service Layer
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: arcana-service-hpa
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-service
+    app.kubernetes.io/part-of: arcana
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: arcana-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

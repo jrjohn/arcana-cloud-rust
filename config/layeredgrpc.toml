@@ -1,0 +1,11 @@
+# Arcana Cloud Rust - Layered gRPC Deployment Configuration
+# This file is loaded when ARCANA_DEPLOYMENT_MODE=layeredgrpc
+
+[deployment]
+mode = "layeredgrpc"
+protocol = "grpc"
+
+# Layer-specific settings are configured via environment variables:
+# ARCANA_DEPLOYMENT__LAYER = "controller" | "service" | "repository"
+# ARCANA_DEPLOYMENT__SERVICE_URL = "http://service:9090" (for controller)
+# ARCANA_DEPLOYMENT__REPOSITORY_URL = "http://repository:9090" (for service)

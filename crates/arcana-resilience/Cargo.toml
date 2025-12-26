@@ -1,0 +1,18 @@
+[package]
+name = "arcana-resilience"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Resilience patterns for Arcana Cloud Rust - circuit breaker, retry, rate limiting"
+
+[dependencies]
+arcana-core.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+tracing.workspace = true
+governor.workspace = true
+backoff.workspace = true
+async-trait.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

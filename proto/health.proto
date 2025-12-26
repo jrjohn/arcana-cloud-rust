@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package arcana.health;
+
+option java_multiple_files = true;
+option java_package = "com.arcana.cloud.grpc.health";
+
+// Health service for gRPC health checking protocol
+service Health {
+  // Check health status
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Watch health status changes
+  rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse);
+}
+
+// Health check request
+message HealthCheckRequest {
+  string service = 1;
+}
+
+// Health check response
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+  ServingStatus status = 1;
+}
