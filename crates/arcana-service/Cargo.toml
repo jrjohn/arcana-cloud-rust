@@ -7,8 +7,7 @@ license.workspace = true
 description = "Business logic service layer for Arcana Cloud Rust"
 
 [dependencies]
-arcana-core.workspace = true
-arcana-domain.workspace = true
+arcana-core = { workspace = true, features = ["openapi"] }
 arcana-config.workspace = true
 arcana-repository.workspace = true
 arcana-security.workspace = true
@@ -19,8 +18,10 @@ uuid.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 validator.workspace = true
+utoipa.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 shaku.workspace = true
+deadpool-redis.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

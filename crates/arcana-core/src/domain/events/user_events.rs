@@ -1,7 +1,7 @@
 //! User-related domain events.
 
-use crate::value_objects::{UserRole, UserStatus};
-use arcana_core::{ArcanaResult, DomainEvent, UserId};
+use super::super::value_objects::{UserRole, UserStatus};
+use crate::{ArcanaResult, DomainEvent, UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -248,7 +248,7 @@ impl DomainEvent for UserEmailVerified {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arcana_core::DomainEvent;
+    use crate::DomainEvent;
 
     #[test]
     fn test_user_created_event() {

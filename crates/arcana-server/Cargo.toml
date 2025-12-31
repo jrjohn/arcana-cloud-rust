@@ -6,13 +6,16 @@ authors.workspace = true
 license.workspace = true
 description = "Main server application for Arcana Cloud Rust"
 
+[lib]
+name = "arcana_server"
+path = "src/lib.rs"
+
 [[bin]]
 name = "arcana-server"
 path = "src/main.rs"
 
 [dependencies]
-arcana-core.workspace = true
-arcana-domain.workspace = true
+arcana-core = { workspace = true, features = ["telemetry"] }
 arcana-config.workspace = true
 arcana-repository.workspace = true
 arcana-security.workspace = true
@@ -21,12 +24,18 @@ arcana-rest.workspace = true
 arcana-grpc.workspace = true
 arcana-resilience.workspace = true
 axum.workspace = true
+tower-http.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
+tracing-opentelemetry.workspace = true
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true
 shaku.workspace = true
+deadpool-redis.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

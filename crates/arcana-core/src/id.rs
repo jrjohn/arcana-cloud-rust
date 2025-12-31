@@ -6,6 +6,8 @@ use uuid::Uuid;
 
 /// A strongly-typed wrapper for user IDs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = String, format = "uuid", example = "550e8400-e29b-41d4-a716-446655440000"))]
 #[serde(transparent)]
 pub struct UserId(pub Uuid);
 

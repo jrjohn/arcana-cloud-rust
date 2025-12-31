@@ -1,25 +1,28 @@
 //! MySQL user repository implementation.
 
-use crate::{traits::UserRepository, DatabasePool};
+use crate::{traits::UserRepository, DatabasePoolInterface};
 use arcana_core::{ArcanaError, ArcanaResult, Page, PageRequest, UserId};
-use arcana_domain::{Email, User, UserRole, UserStatus};
+use arcana_core::{Email, User, UserRole, UserStatus};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use shaku::Component;
 use sqlx::FromRow;
 use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
 /// MySQL user repository implementation.
-#[derive(Clone)]
+#[derive(Component, Clone)]
+#[shaku(interface = UserRepository)]
 pub struct MySqlUserRepository {
-    pool: Arc<DatabasePool>,
+    #[shaku(inject)]
+    pool: Arc<dyn DatabasePoolInterface>,
 }
 
 impl MySqlUserRepository {
     /// Creates a new MySQL user repository.
     #[must_use]
-    pub fn new(pool: Arc<DatabasePool>) -> Self {
+    pub fn new(pool: Arc<dyn DatabasePoolInterface>) -> Self {
         Self { pool }
     }
 }

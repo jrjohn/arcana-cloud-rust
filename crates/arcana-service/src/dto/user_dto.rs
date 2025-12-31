@@ -1,13 +1,14 @@
 //! User-related DTOs.
 
 use arcana_core::UserId;
-use arcana_domain::{User, UserRole, UserStatus};
+use arcana_core::{User, UserRole, UserStatus};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 /// Request to create a new user.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateUserRequest {
     #[validate(length(min = 3, max = 32, message = "Username must be 3-32 characters"))]
     pub username: String,
@@ -26,7 +27,7 @@ pub struct CreateUserRequest {
 }
 
 /// Request to update user profile.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct UpdateUserRequest {
     #[validate(length(max = 64))]
     pub first_name: Option<String>,
@@ -39,20 +40,21 @@ pub struct UpdateUserRequest {
 }
 
 /// Request to update user role (admin only).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct UpdateUserRoleRequest {
     pub role: UserRole,
 }
 
 /// Request to update user status (admin only).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct UpdateUserStatusRequest {
     pub status: UserStatus,
+    #[validate(length(max = 500, message = "Reason cannot exceed 500 characters"))]
     pub reason: Option<String>,
 }
 
 /// Request to change password.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct ChangePasswordRequest {
     pub current_password: String,
 
@@ -61,7 +63,7 @@ pub struct ChangePasswordRequest {
 }
 
 /// User response DTO.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
     pub id: UserId,
     pub username: String,
@@ -113,7 +115,7 @@ impl From<&User> for UserResponse {
 }
 
 /// User list response with pagination.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UserListResponse {
     pub users: Vec<UserResponse>,
     pub page: usize,
@@ -125,7 +127,7 @@ pub struct UserListResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arcana_domain::Email;
+    use arcana_core::Email;
     use validator::Validate;
 
     fn create_test_user() -> User {

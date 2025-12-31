@@ -1,7 +1,6 @@
 //! gRPC health service implementation.
 
 use crate::proto::health::{
-    self,
     health_check_response::ServingStatus,
     health_server::Health,
     HealthCheckRequest, HealthCheckResponse,

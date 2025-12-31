@@ -1,6 +1,6 @@
 //! Authentication middleware.
 
-use arcana_security::{Claims, TokenProvider};
+use arcana_security::{Claims, TokenProvider, TokenProviderInterface};
 use axum::{
     body::Body,
     extract::State,
@@ -14,7 +14,21 @@ use tracing::debug;
 /// Authentication middleware state.
 #[derive(Clone)]
 pub struct AuthMiddlewareState {
-    pub token_provider: Arc<TokenProvider>,
+    pub token_provider: Arc<dyn TokenProviderInterface>,
+}
+
+impl AuthMiddlewareState {
+    /// Creates a new auth middleware state from a token provider.
+    pub fn new(token_provider: Arc<dyn TokenProviderInterface>) -> Self {
+        Self { token_provider }
+    }
+
+    /// Creates from a concrete TokenProvider (for backward compatibility).
+    pub fn from_provider(provider: Arc<TokenProvider>) -> Self {
+        Self {
+            token_provider: provider,
+        }
+    }
 }
 
 /// Authentication middleware that validates JWT tokens.

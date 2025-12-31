@@ -1,7 +1,9 @@
 //! Application configuration structures.
 
 use crate::{CommunicationProtocol, DeploymentLayer, DeploymentMode};
+use arcana_core::Interface;
 use serde::{Deserialize, Serialize};
+use shaku::Component;
 use std::time::Duration;
 
 /// Root application configuration.
@@ -217,26 +219,60 @@ impl Default for RedisConfig {
     }
 }
 
+/// Interface for security configuration.
+///
+/// This trait abstracts security configuration for dependency injection.
+pub trait SecurityConfigInterface: Interface + Send + Sync {
+    /// Returns the JWT secret key.
+    fn jwt_secret(&self) -> &str;
+    /// Returns the JWT access token expiration in seconds.
+    fn jwt_access_expiration_secs(&self) -> u64;
+    /// Returns the JWT refresh token expiration in seconds.
+    fn jwt_refresh_expiration_secs(&self) -> u64;
+    /// Returns the JWT issuer.
+    fn jwt_issuer(&self) -> &str;
+    /// Returns the JWT audience.
+    fn jwt_audience(&self) -> &str;
+    /// Returns whether TLS is enabled for gRPC.
+    fn grpc_tls_enabled(&self) -> bool;
+    /// Returns the TLS certificate path.
+    fn tls_cert_path(&self) -> Option<&str>;
+    /// Returns the TLS private key path.
+    fn tls_key_path(&self) -> Option<&str>;
+    /// Returns the password hashing cost.
+    fn password_hash_cost(&self) -> u32;
+}
+
 /// Security configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[shaku(interface = SecurityConfigInterface)]
 pub struct SecurityConfig {
     /// JWT secret key.
+    #[shaku(default)]
     pub jwt_secret: String,
     /// JWT access token expiration in seconds.
+    #[shaku(default)]
     pub jwt_access_expiration_secs: u64,
     /// JWT refresh token expiration in seconds.
+    #[shaku(default)]
     pub jwt_refresh_expiration_secs: u64,
     /// JWT issuer.
+    #[shaku(default)]
     pub jwt_issuer: String,
     /// JWT audience.
+    #[shaku(default)]
     pub jwt_audience: String,
     /// Enable TLS for gRPC.
+    #[shaku(default)]
     pub grpc_tls_enabled: bool,
     /// Path to TLS certificate.
+    #[shaku(default)]
     pub tls_cert_path: Option<String>,
     /// Path to TLS private key.
+    #[shaku(default)]
     pub tls_key_path: Option<String>,
     /// Password hashing cost (Argon2).
+    #[shaku(default)]
     pub password_hash_cost: u32,
 }
 
@@ -267,6 +303,44 @@ impl SecurityConfig {
     #[must_use]
     pub const fn refresh_token_expiration(&self) -> Duration {
         Duration::from_secs(self.jwt_refresh_expiration_secs)
+    }
+}
+
+impl SecurityConfigInterface for SecurityConfig {
+    fn jwt_secret(&self) -> &str {
+        &self.jwt_secret
+    }
+
+    fn jwt_access_expiration_secs(&self) -> u64 {
+        self.jwt_access_expiration_secs
+    }
+
+    fn jwt_refresh_expiration_secs(&self) -> u64 {
+        self.jwt_refresh_expiration_secs
+    }
+
+    fn jwt_issuer(&self) -> &str {
+        &self.jwt_issuer
+    }
+
+    fn jwt_audience(&self) -> &str {
+        &self.jwt_audience
+    }
+
+    fn grpc_tls_enabled(&self) -> bool {
+        self.grpc_tls_enabled
+    }
+
+    fn tls_cert_path(&self) -> Option<&str> {
+        self.tls_cert_path.as_deref()
+    }
+
+    fn tls_key_path(&self) -> Option<&str> {
+        self.tls_key_path.as_deref()
+    }
+
+    fn password_hash_cost(&self) -> u32 {
+        self.password_hash_cost
     }
 }
 
@@ -362,6 +436,25 @@ pub struct ObservabilityConfig {
     pub metrics_path: String,
     /// Enable request tracing.
     pub tracing_enabled: bool,
+
+    // OpenTelemetry settings
+    /// Service name for distributed tracing.
+    #[serde(default = "default_service_name")]
+    pub service_name: String,
+    /// OTLP endpoint URL (e.g., "http://localhost:4317").
+    #[serde(default)]
+    pub otlp_endpoint: Option<String>,
+    /// Sampling ratio for traces (0.0 to 1.0).
+    #[serde(default = "default_sampling_ratio")]
+    pub sampling_ratio: f64,
+}
+
+fn default_service_name() -> String {
+    "arcana-cloud-rust".to_string()
+}
+
+fn default_sampling_ratio() -> f64 {
+    1.0
 }
 
 impl Default for ObservabilityConfig {
@@ -372,6 +465,23 @@ impl Default for ObservabilityConfig {
             metrics_enabled: true,
             metrics_path: "/metrics".to_string(),
             tracing_enabled: true,
+            service_name: default_service_name(),
+            otlp_endpoint: None,
+            sampling_ratio: default_sampling_ratio(),
+        }
+    }
+}
+
+impl ObservabilityConfig {
+    /// Convert to TelemetryConfig for arcana_core::telemetry.
+    #[must_use]
+    pub fn to_telemetry_config(&self) -> arcana_core::telemetry::TelemetryConfig {
+        arcana_core::telemetry::TelemetryConfig {
+            enabled: self.tracing_enabled && self.otlp_endpoint.is_some(),
+            service_name: self.service_name.clone(),
+            otlp_endpoint: self.otlp_endpoint.clone(),
+            sampling_ratio: self.sampling_ratio,
+            console_output: self.log_format == "pretty",
         }
     }
 }

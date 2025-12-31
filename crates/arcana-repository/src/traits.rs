@@ -1,7 +1,7 @@
 //! Repository trait definitions.
 
 use arcana_core::{ArcanaResult, Interface, Page, PageRequest, UserId};
-use arcana_domain::{User, UserRole};
+use arcana_core::{User, UserRole};
 use async_trait::async_trait;
 
 /// User repository trait.

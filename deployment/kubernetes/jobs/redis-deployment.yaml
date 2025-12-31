@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arcana-jobs-redis
+  labels:
+    app: arcana
+    component: jobs-redis
+    tier: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: arcana
+      component: jobs-redis
+  template:
+    metadata:
+      labels:
+        app: arcana
+        component: jobs-redis
+        tier: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - "256mb"
+            - --maxmemory-policy
+            - "volatile-lru"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 999
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcana-jobs-redis
+  labels:
+    app: arcana
+    component: jobs-redis
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: redis
+      protocol: TCP
+      name: redis
+  selector:
+    app: arcana
+    component: jobs-redis
+---
+# For production, use a StatefulSet with PVC
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: arcana-jobs-redis-ha
+  labels:
+    app: arcana
+    component: jobs-redis-ha
+    tier: cache
+spec:
+  serviceName: arcana-jobs-redis-ha
+  replicas: 0  # Set to 3 for HA mode
+  selector:
+    matchLabels:
+      app: arcana
+      component: jobs-redis-ha
+  template:
+    metadata:
+      labels:
+        app: arcana
+        component: jobs-redis-ha
+        tier: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - "1gb"
+            - --maxmemory-policy
+            - "volatile-lru"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 10Gi

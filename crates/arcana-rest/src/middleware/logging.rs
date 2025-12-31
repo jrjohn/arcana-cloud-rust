@@ -7,7 +7,7 @@ use axum::{
     response::Response,
 };
 use std::time::Instant;
-use tracing::{info, Span};
+use tracing::info;
 
 /// Request logging middleware.
 pub async fn logging_middleware(

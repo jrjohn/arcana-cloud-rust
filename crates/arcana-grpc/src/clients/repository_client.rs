@@ -1,15 +1,23 @@
 //! Remote repository client via gRPC.
 
 use crate::proto::{common, repository, user as user_proto};
+use crate::tls::build_client_tls_from_config;
+use arcana_config::SecurityConfig;
 use arcana_core::{ArcanaError, ArcanaResult, Page, PageRequest, UserId};
-use arcana_domain::{Email, User, UserRole, UserStatus};
+use arcana_core::{Email, User, UserRole, UserStatus};
 use arcana_repository::UserRepository;
 use async_trait::async_trait;
+use shaku::Component;
 use std::sync::Arc;
-use tonic::transport::Channel;
-use tracing::debug;
+use tonic::transport::{Channel, Endpoint};
+use tracing::{debug, info};
 
 /// Remote user repository client that communicates via gRPC.
+///
+/// Note: Since gRPC channel creation is async, the client must be pre-created
+/// and provided via Component parameters.
+#[derive(Component, Clone)]
+#[shaku(interface = UserRepository)]
 pub struct RemoteUserRepository {
     client: repository::repository_service_client::RepositoryServiceClient<Channel>,
 }
@@ -17,6 +25,7 @@ pub struct RemoteUserRepository {
 impl RemoteUserRepository {
     /// Creates a new remote repository client.
     pub async fn connect(addr: &str) -> ArcanaResult<Self> {
+        info!("Connecting to repository service at {} (no TLS)", addr);
         let client = repository::repository_service_client::RepositoryServiceClient::connect(addr.to_string())
             .await
             .map_err(|e| ArcanaError::Internal(format!("Failed to connect to repository service: {}", e)))?;
@@ -24,11 +33,54 @@ impl RemoteUserRepository {
         Ok(Self { client })
     }
 
+    /// Creates a new remote repository client with TLS configuration.
+    ///
+    /// If TLS is disabled in the security config, connects without TLS.
+    pub async fn connect_with_tls(addr: &str, security_config: &SecurityConfig) -> ArcanaResult<Self> {
+        let tls_config = build_client_tls_from_config(security_config)?;
+
+        let endpoint = Endpoint::try_from(addr.to_string())
+            .map_err(|e| ArcanaError::Configuration(format!("Invalid endpoint address: {}", e)))?;
+
+        let channel = if let Some(tls) = tls_config {
+            info!("Connecting to repository service at {} with TLS", addr);
+            endpoint
+                .tls_config(tls)
+                .map_err(|e| ArcanaError::Configuration(format!("Failed to configure TLS: {}", e)))?
+                .connect()
+                .await
+                .map_err(|e| ArcanaError::Internal(format!("Failed to connect with TLS: {}", e)))?
+        } else {
+            info!("Connecting to repository service at {} (no TLS)", addr);
+            endpoint
+                .connect()
+                .await
+                .map_err(|e| ArcanaError::Internal(format!("Failed to connect: {}", e)))?
+        };
+
+        Ok(Self {
+            client: repository::repository_service_client::RepositoryServiceClient::new(channel),
+        })
+    }
+
     /// Creates from an existing channel.
     pub fn from_channel(channel: Channel) -> Self {
         Self {
             client: repository::repository_service_client::RepositoryServiceClient::new(channel),
         }
+    }
+
+    /// Creates from an existing gRPC client.
+    pub fn with_client(client: repository::repository_service_client::RepositoryServiceClient<Channel>) -> Self {
+        Self { client }
+    }
+
+    /// Returns the gRPC client.
+    ///
+    /// This is used for Shaku component parameter extraction.
+    #[must_use]
+    pub fn client(&self) -> &repository::repository_service_client::RepositoryServiceClient<Channel> {
+        &self.client
     }
 }
 
@@ -266,6 +318,15 @@ impl UserRepository for RemoteUserRepository {
 /// Creates a shareable remote user repository.
 pub async fn create_remote_user_repository(addr: &str) -> ArcanaResult<Arc<dyn UserRepository>> {
     let client = RemoteUserRepository::connect(addr).await?;
+    Ok(Arc::new(client))
+}
+
+/// Creates a shareable remote user repository with TLS support.
+pub async fn create_remote_user_repository_with_tls(
+    addr: &str,
+    security_config: &SecurityConfig,
+) -> ArcanaResult<Arc<dyn UserRepository>> {
+    let client = RemoteUserRepository::connect_with_tls(addr, security_config).await?;
     Ok(Arc::new(client))
 }
 

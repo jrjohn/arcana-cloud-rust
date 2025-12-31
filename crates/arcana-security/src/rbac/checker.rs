@@ -1,7 +1,7 @@
 //! RBAC permission checker.
 
 use arcana_core::{ArcanaError, ArcanaResult, UserId};
-use arcana_domain::{Permission, UserRole};
+use arcana_core::{Permission, UserRole};
 use crate::Claims;
 
 /// Extension trait for Claims to check permissions.

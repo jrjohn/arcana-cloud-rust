@@ -1,0 +1,399 @@
+syntax = "proto3";
+
+package arcana.jobs.v1;
+
+option java_package = "com.arcana.jobs.v1";
+option java_multiple_files = true;
+
+// Job queue service for distributed job management.
+service JobQueueService {
+    // Enqueue a new job.
+    rpc Enqueue(EnqueueRequest) returns (EnqueueResponse);
+
+    // Enqueue multiple jobs in batch.
+    rpc EnqueueBatch(EnqueueBatchRequest) returns (EnqueueBatchResponse);
+
+    // Get job status by ID.
+    rpc GetJob(GetJobRequest) returns (GetJobResponse);
+
+    // Cancel a pending job.
+    rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
+
+    // Retry a failed job.
+    rpc RetryJob(RetryJobRequest) returns (RetryJobResponse);
+
+    // Get queue statistics.
+    rpc GetQueueStats(GetQueueStatsRequest) returns (GetQueueStatsResponse);
+
+    // Stream job status updates (for monitoring).
+    rpc WatchJobs(WatchJobsRequest) returns (stream JobEvent);
+}
+
+// Worker service for job processing coordination.
+service WorkerService {
+    // Register a worker with the coordinator.
+    rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+
+    // Send heartbeat to indicate worker is alive.
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+    // Dequeue jobs for processing.
+    rpc Dequeue(DequeueRequest) returns (DequeueResponse);
+
+    // Report job completion.
+    rpc Complete(CompleteRequest) returns (CompleteResponse);
+
+    // Report job failure.
+    rpc Fail(FailRequest) returns (FailResponse);
+}
+
+// Job priority levels.
+enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    PRIORITY_LOW = 1;
+    PRIORITY_NORMAL = 2;
+    PRIORITY_HIGH = 3;
+    PRIORITY_CRITICAL = 4;
+}
+
+// Job status.
+enum JobStatus {
+    JOB_STATUS_UNSPECIFIED = 0;
+    JOB_STATUS_PENDING = 1;
+    JOB_STATUS_SCHEDULED = 2;
+    JOB_STATUS_RUNNING = 3;
+    JOB_STATUS_COMPLETED = 4;
+    JOB_STATUS_FAILED = 5;
+    JOB_STATUS_DEAD_LETTER = 6;
+    JOB_STATUS_CANCELLED = 7;
+}
+
+// Job definition.
+message Job {
+    // Unique job ID.
+    string id = 1;
+
+    // Job type name.
+    string name = 2;
+
+    // Queue name.
+    string queue = 3;
+
+    // Job payload (JSON).
+    string payload = 4;
+
+    // Job priority.
+    Priority priority = 5;
+
+    // Current attempt number.
+    uint32 attempt = 6;
+
+    // Maximum attempts.
+    uint32 max_attempts = 7;
+
+    // Job timeout in seconds.
+    uint64 timeout_secs = 8;
+
+    // When the job was created (RFC3339).
+    string created_at = 9;
+
+    // When the job should be executed (RFC3339).
+    string scheduled_at = 10;
+
+    // Correlation ID for tracing.
+    optional string correlation_id = 11;
+
+    // Tags for categorization.
+    repeated string tags = 12;
+}
+
+// Job info with status.
+message JobInfo {
+    // Job details.
+    Job job = 1;
+
+    // Current status.
+    JobStatus status = 2;
+
+    // When execution started (RFC3339).
+    optional string started_at = 3;
+
+    // When execution completed (RFC3339).
+    optional string completed_at = 4;
+
+    // Last error message.
+    optional string last_error = 5;
+
+    // Worker ID processing this job.
+    optional string worker_id = 6;
+}
+
+// Enqueue request.
+message EnqueueRequest {
+    // Job type name.
+    string name = 1;
+
+    // Queue name (default: "default").
+    string queue = 2;
+
+    // Job payload (JSON).
+    string payload = 3;
+
+    // Job priority.
+    Priority priority = 4;
+
+    // Delay in seconds before execution.
+    uint64 delay_secs = 5;
+
+    // Schedule for specific time (RFC3339).
+    optional string scheduled_at = 6;
+
+    // Maximum retry attempts.
+    uint32 max_retries = 7;
+
+    // Job timeout in seconds.
+    uint64 timeout_secs = 8;
+
+    // Correlation ID for tracing.
+    optional string correlation_id = 9;
+
+    // Tags for categorization.
+    repeated string tags = 10;
+
+    // Unique key for deduplication.
+    optional string unique_key = 11;
+}
+
+// Enqueue response.
+message EnqueueResponse {
+    // Assigned job ID.
+    string job_id = 1;
+
+    // Scheduled execution time (RFC3339).
+    string scheduled_at = 2;
+}
+
+// Batch enqueue request.
+message EnqueueBatchRequest {
+    // Jobs to enqueue.
+    repeated EnqueueRequest jobs = 1;
+}
+
+// Batch enqueue response.
+message EnqueueBatchResponse {
+    // Results for each job.
+    repeated EnqueueResult results = 1;
+}
+
+// Individual enqueue result.
+message EnqueueResult {
+    // Success flag.
+    bool success = 1;
+
+    // Job ID if successful.
+    optional string job_id = 2;
+
+    // Error message if failed.
+    optional string error = 3;
+}
+
+// Get job request.
+message GetJobRequest {
+    // Job ID.
+    string job_id = 1;
+}
+
+// Get job response.
+message GetJobResponse {
+    // Job info.
+    JobInfo job = 1;
+}
+
+// Cancel job request.
+message CancelJobRequest {
+    // Job ID.
+    string job_id = 1;
+
+    // Reason for cancellation.
+    optional string reason = 2;
+}
+
+// Cancel job response.
+message CancelJobResponse {
+    // Success flag.
+    bool success = 1;
+}
+
+// Retry job request.
+message RetryJobRequest {
+    // Job ID.
+    string job_id = 1;
+}
+
+// Retry job response.
+message RetryJobResponse {
+    // New job ID after retry.
+    string job_id = 1;
+}
+
+// Queue stats request.
+message GetQueueStatsRequest {
+    // Queue names (empty = all queues).
+    repeated string queues = 1;
+}
+
+// Queue stats response.
+message GetQueueStatsResponse {
+    // Stats per queue.
+    repeated QueueStats queues = 1;
+
+    // Aggregate totals.
+    QueueStats total = 2;
+}
+
+// Queue statistics.
+message QueueStats {
+    // Queue name.
+    string queue = 1;
+
+    // Pending jobs.
+    uint64 pending = 2;
+
+    // Active (running) jobs.
+    uint64 active = 3;
+
+    // Completed jobs.
+    uint64 completed = 4;
+
+    // Failed jobs.
+    uint64 failed = 5;
+
+    // Dead letter queue count.
+    uint64 dead_letter = 6;
+
+    // Delayed jobs.
+    uint64 delayed = 7;
+}
+
+// Watch jobs request.
+message WatchJobsRequest {
+    // Filter by queue names.
+    repeated string queues = 1;
+
+    // Filter by job names.
+    repeated string job_names = 2;
+
+    // Include status updates.
+    bool include_status_updates = 3;
+}
+
+// Job event for streaming.
+message JobEvent {
+    // Event type.
+    string event_type = 1;
+
+    // Job info.
+    JobInfo job = 2;
+
+    // Event timestamp (RFC3339).
+    string timestamp = 3;
+}
+
+// Register worker request.
+message RegisterWorkerRequest {
+    // Worker ID.
+    string worker_id = 1;
+
+    // Queues this worker processes.
+    repeated string queues = 2;
+
+    // Maximum concurrent jobs.
+    uint32 concurrency = 3;
+
+    // Job types this worker can handle.
+    repeated string job_types = 4;
+}
+
+// Register worker response.
+message RegisterWorkerResponse {
+    // Registration successful.
+    bool success = 1;
+
+    // Heartbeat interval in seconds.
+    uint64 heartbeat_interval_secs = 2;
+}
+
+// Heartbeat request.
+message HeartbeatRequest {
+    // Worker ID.
+    string worker_id = 1;
+
+    // Current job count.
+    uint32 active_jobs = 2;
+}
+
+// Heartbeat response.
+message HeartbeatResponse {
+    // Continue processing flag.
+    bool continue_processing = 1;
+}
+
+// Dequeue request.
+message DequeueRequest {
+    // Worker ID.
+    string worker_id = 1;
+
+    // Queues to dequeue from (in priority order).
+    repeated string queues = 2;
+
+    // Maximum jobs to dequeue.
+    uint32 max_jobs = 3;
+}
+
+// Dequeue response.
+message DequeueResponse {
+    // Dequeued jobs.
+    repeated Job jobs = 1;
+}
+
+// Complete request.
+message CompleteRequest {
+    // Worker ID.
+    string worker_id = 1;
+
+    // Job ID.
+    string job_id = 2;
+
+    // Optional result data (JSON).
+    optional string result = 3;
+}
+
+// Complete response.
+message CompleteResponse {
+    // Success flag.
+    bool success = 1;
+}
+
+// Fail request.
+message FailRequest {
+    // Worker ID.
+    string worker_id = 1;
+
+    // Job ID.
+    string job_id = 2;
+
+    // Error message.
+    string error = 3;
+
+    // Should retry.
+    bool should_retry = 4;
+}
+
+// Fail response.
+message FailResponse {
+    // Whether job was retried.
+    bool retried = 1;
+
+    // Whether job was moved to DLQ.
+    bool dead_lettered = 2;
+}

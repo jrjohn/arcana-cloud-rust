@@ -1,14 +1,15 @@
 //! Authentication controller.
 
 use crate::{
-    extractors::AuthenticatedUser,
+    extractors::{AuthenticatedUser, ValidatedJson},
     responses::{ok, AppError, ApiResult},
     state::AppState,
 };
+use arcana_core::ErrorResponse;
 use arcana_service::{
     AuthResponse, AuthUserInfo, LoginRequest, MessageResponse, RefreshTokenRequest, RegisterRequest,
 };
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, routing::post, Router};
 use tracing::debug;
 
 /// Creates the auth router.
@@ -22,9 +23,21 @@ pub fn router() -> Router<AppState> {
 }
 
 /// Register a new user.
-async fn register(
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    tag = "auth",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "Registration successful", body = AuthResponse),
+        (status = 400, description = "Invalid request", body = ErrorResponse),
+        (status = 409, description = "Username or email already exists", body = ErrorResponse),
+        (status = 422, description = "Validation error", body = ErrorResponse)
+    )
+)]
+pub async fn register(
     State(state): State<AppState>,
-    Json(request): Json<RegisterRequest>,
+    ValidatedJson(request): ValidatedJson<RegisterRequest>,
 ) -> ApiResult<AuthResponse> {
     debug!("Registration request for: {}", request.username);
 
@@ -33,9 +46,20 @@ async fn register(
 }
 
 /// Login with username/email and password.
-async fn login(
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials", body = ErrorResponse),
+        (status = 422, description = "Validation error", body = ErrorResponse)
+    )
+)]
+pub async fn login(
     State(state): State<AppState>,
-    Json(request): Json<LoginRequest>,
+    ValidatedJson(request): ValidatedJson<LoginRequest>,
 ) -> ApiResult<AuthResponse> {
     debug!("Login request for: {}", request.username_or_email);
 
@@ -44,9 +68,20 @@ async fn login(
 }
 
 /// Refresh access token using refresh token.
-async fn refresh_token(
+#[utoipa::path(
+    post,
+    path = "/auth/refresh",
+    tag = "auth",
+    request_body = RefreshTokenRequest,
+    responses(
+        (status = 200, description = "Token refreshed successfully", body = AuthResponse),
+        (status = 401, description = "Invalid or expired refresh token", body = ErrorResponse),
+        (status = 422, description = "Validation error", body = ErrorResponse)
+    )
+)]
+pub async fn refresh_token(
     State(state): State<AppState>,
-    Json(request): Json<RefreshTokenRequest>,
+    ValidatedJson(request): ValidatedJson<RefreshTokenRequest>,
 ) -> ApiResult<AuthResponse> {
     debug!("Token refresh request");
 
@@ -55,7 +90,19 @@ async fn refresh_token(
 }
 
 /// Logout (invalidate tokens).
-async fn logout(
+#[utoipa::path(
+    post,
+    path = "/auth/logout",
+    tag = "auth",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "Logout successful", body = MessageResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    )
+)]
+pub async fn logout(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> ApiResult<MessageResponse> {
@@ -70,7 +117,19 @@ async fn logout(
 }
 
 /// Get current authenticated user.
-async fn get_current_user(
+#[utoipa::path(
+    get,
+    path = "/auth/me",
+    tag = "auth",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "Current user info", body = AuthUserInfo),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    )
+)]
+pub async fn get_current_user(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> ApiResult<AuthUserInfo> {

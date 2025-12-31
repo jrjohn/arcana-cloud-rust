@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arcana-job-scheduler
+  labels:
+    app: arcana
+    component: job-scheduler
+    tier: scheduler
+spec:
+  # Only one scheduler should be active (leader election handles this)
+  replicas: 2
+  selector:
+    matchLabels:
+      app: arcana
+      component: job-scheduler
+  template:
+    metadata:
+      labels:
+        app: arcana
+        component: job-scheduler
+        tier: scheduler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: arcana-scheduler
+      containers:
+        - name: scheduler
+          image: arcana-server:latest
+          imagePullPolicy: IfNotPresent
+          command: ["./arcana-server"]
+          args: ["--mode", "scheduler"]
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: "info,arcana=debug"
+            - name: APP__MODE
+              value: "scheduler"
+            - name: APP__JOBS__REDIS__URL
+              valueFrom:
+                secretKeyRef:
+                  name: arcana-secrets
+                  key: redis-url
+            - name: APP__JOBS__SCHEDULER__LEADER_TTL_SECS
+              value: "30"
+            - name: APP__JOBS__SCHEDULER__CHECK_INTERVAL_SECS
+              value: "60"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                      - job-scheduler
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcana-job-scheduler
+  labels:
+    app: arcana
+    component: job-scheduler
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9090
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    app: arcana
+    component: job-scheduler
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arcana-scheduler
+  labels:
+    app: arcana
+    component: job-scheduler
+---
+# RBAC for leader election (optional, if using Kubernetes leader election)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: arcana-scheduler-leader-election
+  labels:
+    app: arcana
+    component: job-scheduler
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arcana-scheduler-leader-election
+  labels:
+    app: arcana
+    component: job-scheduler
+subjects:
+  - kind: ServiceAccount
+    name: arcana-scheduler
+roleRef:
+  kind: Role
+  name: arcana-scheduler-leader-election
+  apiGroup: rbac.authorization.k8s.io

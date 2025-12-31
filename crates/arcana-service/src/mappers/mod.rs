@@ -5,7 +5,7 @@
 
 use arcana_core::Page;
 use crate::dto::{UserListResponse, UserResponse};
-use arcana_domain::User;
+use arcana_core::User;
 
 /// Converts a page of users to a user list response.
 impl From<Page<User>> for UserListResponse {

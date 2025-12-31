@@ -1,12 +1,13 @@
 //! Authentication-related DTOs.
 
 use arcana_core::UserId;
-use arcana_domain::UserRole;
+use arcana_core::UserRole;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 /// Login request.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct LoginRequest {
     #[validate(length(min = 1, message = "Username or email is required"))]
     pub username_or_email: String,
@@ -19,7 +20,7 @@ pub struct LoginRequest {
 }
 
 /// Registration request.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct RegisterRequest {
     #[validate(length(min = 3, max = 32, message = "Username must be 3-32 characters"))]
     pub username: String,
@@ -38,13 +39,14 @@ pub struct RegisterRequest {
 }
 
 /// Token refresh request.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct RefreshTokenRequest {
+    #[validate(length(min = 1, message = "Refresh token is required"))]
     pub refresh_token: String,
 }
 
 /// Authentication response.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
@@ -54,7 +56,7 @@ pub struct AuthResponse {
 }
 
 /// User info included in auth response.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthUserInfo {
     pub id: UserId,
     pub username: String,
@@ -65,14 +67,14 @@ pub struct AuthUserInfo {
 }
 
 /// Password reset request.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct PasswordResetRequest {
     #[validate(email(message = "Invalid email address"))]
     pub email: String,
 }
 
 /// Password reset confirmation.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct PasswordResetConfirmRequest {
     pub token: String,
 
@@ -89,7 +91,7 @@ pub struct LogoutRequest {
 }
 
 /// Simple message response.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MessageResponse {
     pub message: String,
 }

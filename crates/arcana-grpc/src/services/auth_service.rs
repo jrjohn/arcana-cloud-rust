@@ -170,11 +170,11 @@ fn to_proto_auth_response(response: arcana_service::dto::AuthResponse) -> auth::
     }
 }
 
-fn to_proto_role(role: arcana_domain::UserRole) -> user_proto::UserRole {
+fn to_proto_role(role: arcana_core::UserRole) -> user_proto::UserRole {
     match role {
-        arcana_domain::UserRole::User => user_proto::UserRole::User,
-        arcana_domain::UserRole::Moderator => user_proto::UserRole::Moderator,
-        arcana_domain::UserRole::Admin => user_proto::UserRole::Admin,
-        arcana_domain::UserRole::SuperAdmin => user_proto::UserRole::SuperAdmin,
+        arcana_core::UserRole::User => user_proto::UserRole::User,
+        arcana_core::UserRole::Moderator => user_proto::UserRole::Moderator,
+        arcana_core::UserRole::Admin => user_proto::UserRole::Admin,
+        arcana_core::UserRole::SuperAdmin => user_proto::UserRole::SuperAdmin,
     }
 }

@@ -7,7 +7,9 @@
 mod app_config;
 mod deployment;
 mod loader;
+pub mod validation;
 
 pub use app_config::*;
 pub use deployment::*;
 pub use loader::*;
+pub use validation::{ConfigValidationError, ConfigValidator, format_validation_errors};

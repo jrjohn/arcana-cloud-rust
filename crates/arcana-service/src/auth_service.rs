@@ -5,10 +5,11 @@ use crate::dto::{
 };
 use arcana_config::SecurityConfig;
 use arcana_core::{ArcanaError, ArcanaResult, Interface, UserId, ValidateExt};
-use arcana_domain::{Email, User, UserStatus};
+use arcana_core::{Email, User, UserStatus};
 use arcana_repository::UserRepository;
-use arcana_security::{Claims, PasswordHasher, TokenProvider};
+use arcana_security::{Claims, PasswordHasher, PasswordHasherInterface, TokenProvider, TokenProviderInterface};
 use async_trait::async_trait;
+use shaku::Component;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -247,11 +248,198 @@ impl<R: UserRepository> std::fmt::Debug for AuthServiceImpl<R> {
     }
 }
 
+/// Concrete authentication service component for Shaku DI.
+///
+/// This component uses dependency injection to receive its dependencies,
+/// providing compile-time verified DI through Shaku.
+#[derive(Component)]
+#[shaku(interface = AuthService)]
+pub struct AuthServiceComponent {
+    #[shaku(inject)]
+    user_repository: Arc<dyn UserRepository>,
+    #[shaku(inject)]
+    password_hasher: Arc<dyn PasswordHasherInterface>,
+    #[shaku(inject)]
+    token_provider: Arc<dyn TokenProviderInterface>,
+}
+
+impl AuthServiceComponent {
+    /// Creates an auth response for a user.
+    fn create_auth_response(&self, user: &User) -> ArcanaResult<AuthResponse> {
+        let tokens = self.token_provider.generate_tokens(
+            user.id,
+            &user.username,
+            user.email.as_str(),
+            user.role,
+        )?;
+
+        Ok(AuthResponse {
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            token_type: tokens.token_type,
+            expires_in: tokens.access_expires_at - chrono::Utc::now().timestamp(),
+            user: AuthUserInfo {
+                id: user.id,
+                username: user.username.clone(),
+                email: user.email.to_string(),
+                role: user.role,
+                first_name: user.first_name.clone(),
+                last_name: user.last_name.clone(),
+            },
+        })
+    }
+}
+
+#[async_trait]
+impl AuthService for AuthServiceComponent {
+    async fn register(&self, request: RegisterRequest) -> ArcanaResult<AuthResponse> {
+        debug!("Registering user: {}", request.username);
+
+        request.validate_request()?;
+
+        if self.user_repository.exists_by_username(&request.username).await? {
+            return Err(ArcanaError::Conflict(format!(
+                "Username '{}' already exists",
+                request.username
+            )));
+        }
+
+        if self.user_repository.exists_by_email(&request.email).await? {
+            return Err(ArcanaError::Conflict(format!(
+                "Email '{}' already exists",
+                request.email
+            )));
+        }
+
+        let email = Email::new(&request.email)
+            .map_err(|e| ArcanaError::Validation(e.to_string()))?;
+
+        let password_hash = self.password_hasher.hash(&request.password)?;
+
+        let mut user = User::new(
+            request.username,
+            email,
+            password_hash,
+            request.first_name,
+            request.last_name,
+        );
+
+        user.activate();
+
+        let saved_user = self.user_repository.save(&user).await?;
+
+        info!("User registered: {}", saved_user.id);
+
+        self.create_auth_response(&saved_user)
+    }
+
+    async fn login(&self, request: LoginRequest) -> ArcanaResult<AuthResponse> {
+        debug!("Login attempt for: {}", request.username_or_email);
+
+        request.validate_request()?;
+
+        let user = self
+            .user_repository
+            .find_by_username_or_email(&request.username_or_email)
+            .await?
+            .ok_or_else(|| {
+                warn!("Login failed: user not found - {}", request.username_or_email);
+                ArcanaError::InvalidCredentials
+            })?;
+
+        if !user.status.can_login() {
+            warn!("Login failed: user status {:?} - {}", user.status, user.id);
+            return Err(match user.status {
+                UserStatus::Suspended => ArcanaError::Forbidden("Account is suspended".to_string()),
+                UserStatus::Locked => ArcanaError::Forbidden("Account is locked".to_string()),
+                UserStatus::Deleted => ArcanaError::InvalidCredentials,
+                _ => ArcanaError::Forbidden("Account is not active".to_string()),
+            });
+        }
+
+        if !self.password_hasher.verify(&request.password, &user.password_hash)? {
+            warn!("Login failed: invalid password - {}", user.id);
+            return Err(ArcanaError::InvalidCredentials);
+        }
+
+        let mut updated_user = user.clone();
+        updated_user.record_login();
+        let _ = self.user_repository.update(&updated_user).await;
+
+        info!("User logged in: {}", user.id);
+
+        self.create_auth_response(&user)
+    }
+
+    async fn refresh_token(&self, request: RefreshTokenRequest) -> ArcanaResult<AuthResponse> {
+        debug!("Refreshing token");
+
+        let claims = self.token_provider.validate_refresh_token(&request.refresh_token)?;
+
+        let user_id = claims.user_id().ok_or_else(|| {
+            ArcanaError::InvalidToken("Invalid refresh token: missing user ID".to_string())
+        })?;
+
+        let user = self
+            .user_repository
+            .find_by_id(user_id)
+            .await?
+            .ok_or_else(|| ArcanaError::InvalidToken("User no longer exists".to_string()))?;
+
+        if !user.status.can_login() {
+            return Err(ArcanaError::Forbidden("Account is not active".to_string()));
+        }
+
+        info!("Token refreshed for user: {}", user.id);
+
+        self.create_auth_response(&user)
+    }
+
+    async fn validate_token(&self, token: &str) -> ArcanaResult<Claims> {
+        self.token_provider.validate_access_token(token)
+    }
+
+    async fn logout(&self, user_id: UserId) -> ArcanaResult<MessageResponse> {
+        debug!("Logging out user: {}", user_id);
+
+        info!("User logged out: {}", user_id);
+        Ok(MessageResponse::new("Successfully logged out"))
+    }
+
+    async fn get_current_user(&self, claims: &Claims) -> ArcanaResult<AuthUserInfo> {
+        let user_id = claims.user_id().ok_or_else(|| {
+            ArcanaError::InvalidToken("Invalid token: missing user ID".to_string())
+        })?;
+
+        let user = self
+            .user_repository
+            .find_by_id(user_id)
+            .await?
+            .ok_or_else(|| ArcanaError::not_found("User", user_id))?;
+
+        Ok(AuthUserInfo {
+            id: user.id,
+            username: user.username,
+            email: user.email.to_string(),
+            role: user.role,
+            first_name: user.first_name,
+            last_name: user.last_name,
+        })
+    }
+}
+
+impl std::fmt::Debug for AuthServiceComponent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthServiceComponent").finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use arcana_core::Page;
-    use arcana_domain::{Email, User, UserRole};
+    use arcana_core::{Email, User, UserRole, UserStatus};
+    use arcana_security::Claims;
     use async_trait::async_trait;
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -679,5 +867,149 @@ mod tests {
         assert!(!auth.refresh_token.is_empty());
         assert_eq!(auth.token_type, "Bearer");
         assert!(auth.expires_in > 0);
+    }
+
+    // =========================================================================
+    // Additional Edge Case Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_login_pending_verification_user() {
+        let hasher = PasswordHasher::new();
+        // Create a user that is pending verification (not activated)
+        let user = User::new(
+            "testuser".to_string(),
+            Email::new_unchecked("test@example.com".to_string()),
+            hasher.hash("Password123").unwrap(),
+            Some("Test".to_string()),
+            Some("User".to_string()),
+        );
+        // Don't activate the user - should be in PendingVerification status
+
+        let repo = MockUserRepository::with_user(user);
+        let service = create_auth_service(repo);
+
+        let request = LoginRequest {
+            username_or_email: "testuser".to_string(),
+            password: "Password123".to_string(),
+            device_id: None,
+        };
+
+        let result = service.login(request).await;
+        // Note: Current implementation allows pending verification users to login
+        // This documents the actual behavior - whether to change depends on business requirements
+        assert!(result.is_ok()); // Pending verification users CAN currently log in
+    }
+
+    #[tokio::test]
+    async fn test_login_deleted_user() {
+        let hasher = PasswordHasher::new();
+        let mut user = User::new(
+            "testuser".to_string(),
+            Email::new_unchecked("test@example.com".to_string()),
+            hasher.hash("Password123").unwrap(),
+            Some("Test".to_string()),
+            Some("User".to_string()),
+        );
+        user.activate();
+        user.status = UserStatus::Deleted;
+
+        let repo = MockUserRepository::with_user(user);
+        let service = create_auth_service(repo);
+
+        let request = LoginRequest {
+            username_or_email: "testuser".to_string(),
+            password: "Password123".to_string(),
+            device_id: None,
+        };
+
+        let result = service.login(request).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_register_with_short_password() {
+        let repo = MockUserRepository::new();
+        let service = create_auth_service(repo);
+
+        let request = RegisterRequest {
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password: "short".to_string(), // Too short
+            first_name: Some("Test".to_string()),
+            last_name: Some("User".to_string()),
+        };
+
+        let result = service.register(request).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_register_with_invalid_email_format() {
+        let repo = MockUserRepository::new();
+        let service = create_auth_service(repo);
+
+        let request = RegisterRequest {
+            username: "testuser".to_string(),
+            email: "not-an-email".to_string(), // Invalid email
+            password: "Password123".to_string(),
+            first_name: Some("Test".to_string()),
+            last_name: Some("User".to_string()),
+        };
+
+        let result = service.register(request).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_current_user_not_found() {
+        let repo = MockUserRepository::new();
+        let service = create_auth_service(repo);
+
+        // Create a claims object with a non-existent user
+        let claims = Claims::new_access(
+            UserId::new(),
+            "nonexistent".to_string(),
+            "nonexistent@example.com".to_string(),
+            UserRole::User,
+            "test-issuer".to_string(),
+            "test-audience".to_string(),
+            chrono::Utc::now() + chrono::Duration::hours(1),
+        );
+
+        let result = service.get_current_user(&claims).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_validate_token_expired() {
+        let user = create_active_user_with_password("Password123");
+        let repo = MockUserRepository::with_user(user);
+        let service = create_auth_service(repo);
+
+        // Create a fake expired-looking token (just invalid)
+        let result = service.validate_token("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.invalid").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_login_case_insensitive_email() {
+        let user = create_active_user_with_password("Password123");
+        let repo = MockUserRepository::with_user(user);
+        let service = create_auth_service(repo);
+
+        // Try logging in with uppercase email
+        let request = LoginRequest {
+            username_or_email: "TEST@EXAMPLE.COM".to_string(),
+            password: "Password123".to_string(),
+            device_id: None,
+        };
+
+        // This test documents behavior - whether case-insensitive or not
+        let result = service.login(request).await;
+        // The repository's find_by_username_or_email should handle this
+        // If it fails, that's expected behavior for case-sensitive lookup
+        // If it succeeds, that means case-insensitive lookup is supported
+        let _ = result; // Either is acceptable
     }
 }

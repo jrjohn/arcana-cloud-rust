@@ -8,7 +8,6 @@ description = "Security module for Arcana Cloud Rust - JWT, RBAC, password hashi
 
 [dependencies]
 arcana-core.workspace = true
-arcana-domain.workspace = true
 arcana-config.workspace = true
 jsonwebtoken.workspace = true
 argon2.workspace = true

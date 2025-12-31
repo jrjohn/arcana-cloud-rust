@@ -56,20 +56,19 @@ where
             .and_then(|h| h.to_str().ok())
             .ok_or_else(|| AuthError(ArcanaError::Unauthorized("Missing authorization header".to_string())))?;
 
-        // Extract the token from "Bearer <token>"
-        let token = auth_header
-            .strip_prefix("Bearer ")
-            .ok_or_else(|| AuthError(ArcanaError::Unauthorized("Invalid authorization format".to_string())))?;
+        // Verify the header has "Bearer " prefix
+        if !auth_header.starts_with("Bearer ") {
+            return Err(AuthError(ArcanaError::Unauthorized("Invalid authorization format".to_string())));
+        }
 
-        // Get the token provider from extensions (set by middleware)
+        // Get claims from extensions (set by middleware if token was valid)
         let claims = parts
             .extensions
             .get::<Claims>()
             .cloned()
             .ok_or_else(|| {
-                // If claims aren't in extensions, we need to validate the token
-                // This shouldn't happen if the auth middleware is properly configured
-                AuthError(ArcanaError::Internal("Auth middleware not configured".to_string()))
+                // Claims not in extensions means the token was invalid or expired
+                AuthError(ArcanaError::Unauthorized("Invalid or expired token".to_string()))
             })?;
 
         Ok(AuthenticatedUser(claims))

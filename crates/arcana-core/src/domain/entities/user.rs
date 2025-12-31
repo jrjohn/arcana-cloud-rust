@@ -1,7 +1,7 @@
 //! User entity.
 
-use crate::value_objects::{Email, UserRole, UserStatus};
-use arcana_core::{Entity, UserId};
+use super::super::value_objects::{Email, UserRole, UserStatus};
+use crate::{Entity, UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;

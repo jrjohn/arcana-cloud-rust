@@ -1,11 +1,12 @@
 //! JWT token provider for creating and validating tokens.
 
-use super::{Claims, TokenType};
+use super::Claims;
 use arcana_config::SecurityConfig;
-use arcana_core::{ArcanaError, ArcanaResult, UserId};
-use arcana_domain::UserRole;
+use arcana_core::{ArcanaError, ArcanaResult, Interface, UserId};
+use arcana_core::UserRole;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use shaku::Component;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
@@ -24,8 +25,38 @@ pub struct TokenPair {
     pub token_type: String,
 }
 
+/// Interface for JWT token operations.
+///
+/// This trait abstracts token generation and validation for dependency injection.
+pub trait TokenProviderInterface: Interface + Send + Sync {
+    /// Generates a token pair for a user.
+    fn generate_tokens(
+        &self,
+        user_id: UserId,
+        username: &str,
+        email: &str,
+        role: UserRole,
+    ) -> ArcanaResult<TokenPair>;
+
+    /// Validates a token and returns the claims.
+    fn validate_token(&self, token: &str) -> ArcanaResult<Claims>;
+
+    /// Validates an access token specifically.
+    fn validate_access_token(&self, token: &str) -> ArcanaResult<Claims>;
+
+    /// Validates a refresh token specifically.
+    fn validate_refresh_token(&self, token: &str) -> ArcanaResult<Claims>;
+
+    /// Refreshes a token pair using a refresh token.
+    fn refresh_tokens(&self, refresh_token: &str) -> ArcanaResult<TokenPair>;
+
+    /// Decodes a token without validation (for inspection).
+    fn decode_without_validation(&self, token: &str) -> ArcanaResult<Claims>;
+}
+
 /// JWT token provider service.
-#[derive(Clone)]
+#[derive(Component, Clone)]
+#[shaku(interface = TokenProviderInterface)]
 pub struct TokenProvider {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
@@ -52,6 +83,30 @@ impl TokenProvider {
             config,
             validation,
         }
+    }
+
+    /// Returns the encoding key.
+    ///
+    /// This is used for Shaku component parameter extraction.
+    #[must_use]
+    pub fn encoding_key(&self) -> &EncodingKey {
+        &self.encoding_key
+    }
+
+    /// Returns the decoding key.
+    ///
+    /// This is used for Shaku component parameter extraction.
+    #[must_use]
+    pub fn decoding_key(&self) -> &DecodingKey {
+        &self.decoding_key
+    }
+
+    /// Returns the validation configuration.
+    ///
+    /// This is used for Shaku component parameter extraction.
+    #[must_use]
+    pub fn validation(&self) -> &Validation {
+        &self.validation
     }
 
     /// Generates a token pair for a user.
@@ -213,6 +268,98 @@ impl std::fmt::Debug for TokenProvider {
             .field("issuer", &self.config.jwt_issuer)
             .field("audience", &self.config.jwt_audience)
             .finish_non_exhaustive()
+    }
+}
+
+impl TokenProviderInterface for TokenProvider {
+    fn generate_tokens(
+        &self,
+        user_id: UserId,
+        username: &str,
+        email: &str,
+        role: UserRole,
+    ) -> ArcanaResult<TokenPair> {
+        let session_id = uuid::Uuid::now_v7().to_string();
+
+        let access_token = self.generate_access_token(user_id, username, email, role)?;
+        let refresh_token = self.generate_refresh_token(user_id, username, email, role, &session_id)?;
+
+        let access_expires_at = (Utc::now() + Duration::seconds(self.config.jwt_access_expiration_secs as i64)).timestamp();
+        let refresh_expires_at = (Utc::now() + Duration::seconds(self.config.jwt_refresh_expiration_secs as i64)).timestamp();
+
+        Ok(TokenPair {
+            access_token,
+            refresh_token,
+            access_expires_at,
+            refresh_expires_at,
+            token_type: "Bearer".to_string(),
+        })
+    }
+
+    fn validate_token(&self, token: &str) -> ArcanaResult<Claims> {
+        let token_data = decode::<Claims>(token, &self.decoding_key, &self.validation)
+            .map_err(|e| {
+                warn!("Token validation failed: {}", e);
+                match e.kind() {
+                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => ArcanaError::TokenExpired,
+                    jsonwebtoken::errors::ErrorKind::InvalidToken
+                    | jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                        ArcanaError::InvalidToken("Invalid token signature".to_string())
+                    }
+                    jsonwebtoken::errors::ErrorKind::InvalidIssuer => {
+                        ArcanaError::InvalidToken("Invalid token issuer".to_string())
+                    }
+                    jsonwebtoken::errors::ErrorKind::InvalidAudience => {
+                        ArcanaError::InvalidToken("Invalid token audience".to_string())
+                    }
+                    _ => ArcanaError::InvalidToken(e.to_string()),
+                }
+            })?;
+
+        Ok(token_data.claims)
+    }
+
+    fn validate_access_token(&self, token: &str) -> ArcanaResult<Claims> {
+        let claims = self.validate_token(token)?;
+
+        if !claims.is_access_token() {
+            return Err(ArcanaError::InvalidToken("Expected access token".to_string()));
+        }
+
+        Ok(claims)
+    }
+
+    fn validate_refresh_token(&self, token: &str) -> ArcanaResult<Claims> {
+        let claims = self.validate_token(token)?;
+
+        if !claims.is_refresh_token() {
+            return Err(ArcanaError::InvalidToken("Expected refresh token".to_string()));
+        }
+
+        Ok(claims)
+    }
+
+    fn refresh_tokens(&self, refresh_token: &str) -> ArcanaResult<TokenPair> {
+        let claims = self.validate_refresh_token(refresh_token)?;
+
+        let user_id = claims.user_id().ok_or_else(|| {
+            ArcanaError::InvalidToken("Refresh token missing user ID".to_string())
+        })?;
+
+        self.generate_tokens(user_id, &claims.username, &claims.email, claims.role)
+    }
+
+    fn decode_without_validation(&self, token: &str) -> ArcanaResult<Claims> {
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.insecure_disable_signature_validation();
+        validation.validate_exp = false;
+        validation.validate_nbf = false;
+        validation.validate_aud = false;
+
+        let token_data = decode::<Claims>(token, &self.decoding_key, &validation)
+            .map_err(|e| ArcanaError::InvalidToken(e.to_string()))?;
+
+        Ok(token_data.claims)
     }
 }
 

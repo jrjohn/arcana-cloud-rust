@@ -1,6 +1,6 @@
 //! OAuth token entity.
 
-use arcana_core::{Entity, OAuthTokenId, UserId};
+use crate::{Entity, OAuthTokenId, UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

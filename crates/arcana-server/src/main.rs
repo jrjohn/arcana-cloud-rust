@@ -9,36 +9,69 @@
 
 use arcana_config::{AppConfig, ConfigLoader, DeploymentLayer, DeploymentMode};
 use arcana_core::ArcanaResult;
-use arcana_repository::create_pool;
-use arcana_rest::{create_router, AppState};
+use arcana_rest::create_router;
 use tokio::signal;
 use tracing::{error, info};
 
-mod app;
-pub mod di;
-mod startup;
-
-use di::AppModuleBuilder;
+use arcana_server::di::{
+    build_distributed_service_module, build_monolithic_module, build_repository_module,
+    DatabaseResolver, RepositoryResolver, ServiceResolver,
+};
 
 #[tokio::main]
 async fn main() {
-    // Initialize logging
-    init_logging();
+    // Load configuration first (needed for telemetry setup)
+    let config = match load_config().await {
+        Ok(config) => config,
+        Err(e) => {
+            // Fall back to basic logging if config fails
+            init_basic_logging();
+            eprintln!("Failed to load configuration: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Initialize telemetry/logging based on config
+    if let Err(e) = init_telemetry(&config) {
+        init_basic_logging();
+        eprintln!("Failed to initialize telemetry: {}", e);
+    }
 
     info!("Starting Arcana Cloud Rust Server...");
     info!("Version: {}", env!("CARGO_PKG_VERSION"));
 
-    if let Err(e) = run().await {
+    if let Err(e) = run_with_config(config).await {
         error!("Application error: {}", e);
+        arcana_core::telemetry::shutdown_telemetry();
         std::process::exit(1);
     }
+
+    arcana_core::telemetry::shutdown_telemetry();
 }
 
-async fn run() -> ArcanaResult<()> {
-    // Load configuration
+async fn load_config() -> ArcanaResult<AppConfig> {
     let config_loader = ConfigLoader::from_default_location()?;
-    let config = config_loader.get().await;
+    Ok(config_loader.get().await)
+}
 
+fn init_telemetry(config: &AppConfig) -> ArcanaResult<()> {
+    let telemetry_config = config.observability.to_telemetry_config();
+    arcana_core::telemetry::init_telemetry(&telemetry_config)
+}
+
+fn init_basic_logging() {
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,arcana=debug"));
+
+    let _ = tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().with_target(true))
+        .try_init();
+}
+
+async fn run_with_config(config: AppConfig) -> ArcanaResult<()> {
     info!("Environment: {}", config.app.environment);
     info!("Deployment mode: {}", config.deployment.mode);
     info!("Layer: {}", config.deployment.layer);
@@ -98,29 +131,18 @@ async fn run_layered_http(config: AppConfig) -> ArcanaResult<()> {
 }
 
 async fn run_monolithic(config: AppConfig) -> ArcanaResult<()> {
-    // Create database pool
-    let db_pool = create_pool(&config.database).await?;
+    // Build Shaku DI module with all components
+    let module = build_monolithic_module(&config.database, &config.redis, config.security.clone()).await?;
 
-    // Run migrations
-    db_pool.run_migrations().await?;
+    // Run migrations using the resolved database pool
+    module.database_pool().run_migrations().await?;
 
-    // Build DI module - centralized dependency injection
-    let module = AppModuleBuilder::new()
-        .with_database_pool(db_pool)
-        .with_security_config(config.security.clone())
-        .with_password_hash_cost(config.security.password_hash_cost)
-        .build();
+    // Create REST router from module
+    let router = create_router(module.as_ref(), &config.server);
 
-    // Resolve services from DI container
+    // Resolve services for gRPC server
     let user_service = module.user_service();
     let auth_service = module.auth_service();
-    let token_provider = module.token_provider();
-
-    // Create application state for REST
-    let app_state = AppState::new(user_service.clone(), auth_service.clone());
-
-    // Create REST router
-    let router = create_router(app_state, token_provider, &config.server);
 
     // Start REST server
     let rest_addr = config.server.rest_addr();
@@ -165,13 +187,16 @@ async fn run_controller_layer_grpc(config: AppConfig) -> ArcanaResult<()> {
 
     // Create token provider for JWT validation (still local)
     let token_provider = arcana_security::TokenProvider::new(std::sync::Arc::new(config.security.clone()));
-    let token_provider = std::sync::Arc::new(token_provider);
+    let token_provider: std::sync::Arc<dyn arcana_security::TokenProviderInterface> =
+        std::sync::Arc::new(token_provider);
 
     // Create application state for REST
-    let app_state = AppState::new(user_service, auth_service);
+    let app_state = arcana_rest::AppState::new(user_service, auth_service);
 
-    // Create REST router
-    let router = create_router(app_state, token_provider, &config.server);
+    // Create REST router with state and token provider
+    // Note: For controller layer, we use the legacy AppState approach
+    // since we're using remote services rather than a Shaku module
+    let router = create_router_legacy(app_state, token_provider, &config.server);
 
     // Start REST server only (controller doesn't expose gRPC)
     let rest_addr = config.server.rest_addr();
@@ -212,32 +237,12 @@ async fn run_service_layer_grpc(config: AppConfig) -> ArcanaResult<()> {
 
     info!("Connecting to repository layer at: {}", repository_url);
 
-    // Create remote repository client via gRPC
-    let user_repository = std::sync::Arc::new(
-        arcana_grpc::RemoteUserRepository::connect(repository_url).await?
-    );
+    // Build Shaku distributed service module
+    let module = build_distributed_service_module(repository_url, &config.redis, config.security.clone()).await?;
 
-    // Create password hasher (local)
-    let password_hasher = std::sync::Arc::new(arcana_security::PasswordHasher::with_cost(
-        config.security.password_hash_cost,
-    ));
-
-    // Create token provider (local)
-    let security_config = std::sync::Arc::new(config.security.clone());
-
-    // Create services with remote repository
-    let user_service: std::sync::Arc<dyn arcana_service::UserService> =
-        std::sync::Arc::new(arcana_service::UserServiceImpl::new(
-            user_repository.clone(),
-            password_hasher.clone(),
-        ));
-
-    let auth_service: std::sync::Arc<dyn arcana_service::AuthService> =
-        std::sync::Arc::new(arcana_service::AuthServiceImpl::new(
-            user_repository,
-            password_hasher,
-            security_config,
-        ));
+    // Resolve services from module
+    let user_service = module.user_service();
+    let auth_service = module.auth_service();
 
     // Create gRPC server to expose services
     let grpc_server =
@@ -268,15 +273,14 @@ async fn run_service_layer_http(config: AppConfig) -> ArcanaResult<()> {
 async fn run_repository_layer(config: AppConfig) -> ArcanaResult<()> {
     info!("Starting Repository Layer");
 
-    // Create database pool
-    let db_pool = create_pool(&config.database).await?;
+    // Build Shaku repository module
+    let module = build_repository_module(&config.database).await?;
 
     // Run migrations
-    db_pool.run_migrations().await?;
+    module.database_pool().run_migrations().await?;
 
-    // Create repository
-    let user_repository: std::sync::Arc<dyn arcana_repository::UserRepository> =
-        std::sync::Arc::new(arcana_repository::MySqlUserRepository::new(db_pool));
+    // Resolve repository from module
+    let user_repository = RepositoryResolver::user_repository(module.as_ref());
 
     // Create gRPC server to expose repository
     let grpc_server = arcana_grpc::RepositoryGrpcServer::new(&config.server, user_repository)?;
@@ -292,16 +296,56 @@ async fn run_repository_layer(config: AppConfig) -> ArcanaResult<()> {
     Ok(())
 }
 
-fn init_logging() {
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+/// Creates a REST router using legacy AppState (for controller layer with remote services).
+fn create_router_legacy(
+    state: arcana_rest::AppState,
+    token_provider: std::sync::Arc<dyn arcana_security::TokenProviderInterface>,
+    server_config: &arcana_config::ServerConfig,
+) -> axum::Router {
+    use arcana_rest::middleware::{auth_middleware, logging_middleware, AuthMiddlewareState};
+    use axum::{middleware, routing::get, Router};
+    use tower_http::{
+        compression::CompressionLayer,
+        cors::{Any, CorsLayer},
+        trace::TraceLayer,
+    };
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,arcana=debug,tower_http=debug"));
+    // Create CORS layer
+    let cors = if server_config.cors_enabled {
+        if server_config.cors_origins.contains(&"*".to_string()) {
+            CorsLayer::permissive()
+        } else {
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any)
+        }
+    } else {
+        CorsLayer::new()
+    };
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer().with_target(true))
-        .init();
+    // Create auth middleware state
+    let auth_state = AuthMiddlewareState::new(token_provider);
+
+    // Build the API router with authentication
+    let api_router = Router::new()
+        .nest("/auth", arcana_rest::controllers::auth_controller::router())
+        .nest("/users", arcana_rest::controllers::user_controller::router())
+        .layer(middleware::from_fn_with_state(auth_state.clone(), auth_middleware))
+        .with_state(state.clone());
+
+    Router::new()
+        // Health endpoints (no auth required)
+        .merge(arcana_rest::controllers::health_controller::router())
+        // API v1
+        .nest("/api/v1", api_router)
+        // Root endpoint
+        .route("/", get(|| async { "Arcana Cloud Rust API v1" }))
+        // Add middleware layers
+        .layer(CompressionLayer::new())
+        .layer(cors)
+        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(logging_middleware))
 }
 
 async fn shutdown_signal() {

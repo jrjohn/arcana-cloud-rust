@@ -1,6 +1,6 @@
 //! Authentication-related domain events.
 
-use arcana_core::{ArcanaResult, DomainEvent, UserId};
+use crate::{ArcanaResult, DomainEvent, UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -262,7 +262,7 @@ impl DomainEvent for PasswordResetRequested {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arcana_core::DomainEvent;
+    use crate::DomainEvent;
 
     #[test]
     fn test_login_succeeded_event() {

@@ -1,15 +1,31 @@
 //! Password hashing using Argon2.
 
-use arcana_core::{ArcanaError, ArcanaResult};
+use arcana_core::{ArcanaError, ArcanaResult, Interface};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher as _, PasswordVerifier, SaltString},
     Argon2, Params,
 };
+use shaku::Component;
 use std::sync::Arc;
 use tracing::debug;
 
+/// Interface for password hashing operations.
+///
+/// This trait abstracts password hashing functionality for dependency injection.
+pub trait PasswordHasherInterface: Interface + Send + Sync {
+    /// Hashes a password.
+    fn hash(&self, password: &str) -> ArcanaResult<String>;
+
+    /// Verifies a password against a hash.
+    fn verify(&self, password: &str, hash: &str) -> ArcanaResult<bool>;
+
+    /// Checks if a hash needs to be rehashed.
+    fn needs_rehash(&self, hash: &str) -> bool;
+}
+
 /// Password hasher service using Argon2.
-#[derive(Clone)]
+#[derive(Component, Clone)]
+#[shaku(interface = PasswordHasherInterface)]
 pub struct PasswordHasher {
     argon2: Arc<Argon2<'static>>,
 }
@@ -42,6 +58,14 @@ impl PasswordHasher {
         .unwrap_or(Params::DEFAULT);
 
         Self::with_params(params)
+    }
+
+    /// Returns the internal Argon2 instance wrapped in Arc.
+    ///
+    /// This is used for Shaku component parameter extraction.
+    #[must_use]
+    pub fn argon2_arc(&self) -> Arc<Argon2<'static>> {
+        self.argon2.clone()
     }
 
     /// Hashes a password.
@@ -97,6 +121,51 @@ impl PasswordHasher {
 impl Default for PasswordHasher {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl PasswordHasherInterface for PasswordHasher {
+    fn hash(&self, password: &str) -> ArcanaResult<String> {
+        let salt = SaltString::generate(&mut OsRng);
+
+        let hash = self
+            .argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {}", e)))?;
+
+        debug!("Password hashed successfully");
+        Ok(hash.to_string())
+    }
+
+    fn verify(&self, password: &str, hash: &str) -> ArcanaResult<bool> {
+        let parsed_hash = PasswordHash::new(hash)
+            .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {}", e)))?;
+
+        match self.argon2.verify_password(password.as_bytes(), &parsed_hash) {
+            Ok(()) => {
+                debug!("Password verified successfully");
+                Ok(true)
+            }
+            Err(argon2::password_hash::Error::Password) => {
+                debug!("Password verification failed: incorrect password");
+                Ok(false)
+            }
+            Err(e) => Err(ArcanaError::Internal(format!(
+                "Password verification error: {}",
+                e
+            ))),
+        }
+    }
+
+    fn needs_rehash(&self, hash: &str) -> bool {
+        if let Ok(parsed) = PasswordHash::new(hash) {
+            if parsed.algorithm != argon2::Algorithm::Argon2id.ident() {
+                return true;
+            }
+            false
+        } else {
+            true
+        }
     }
 }
 

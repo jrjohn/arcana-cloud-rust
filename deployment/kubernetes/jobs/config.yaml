@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arcana-jobs-config
+  labels:
+    app: arcana
+    component: jobs
+data:
+  jobs.toml: |
+    [redis]
+    pool_size = 10
+    connect_timeout_secs = 5
+    key_prefix = "arcana:jobs"
+
+    [worker]
+    concurrency = 4
+    job_timeout_secs = 300
+    poll_interval_ms = 100
+    shutdown_timeout_secs = 30
+    heartbeat_interval_secs = 30
+
+    [queue]
+    max_size = 0  # Unlimited
+    retention_secs = 604800  # 7 days
+
+    [queue.default_retry]
+    max_retries = 3
+    initial_delay_ms = 1000
+    max_delay_ms = 3600000
+    multiplier = 2.0
+
+    [queue.dlq]
+    enabled = true
+    max_size = 10000
+    retention_secs = 2592000  # 30 days
+
+    [scheduler]
+    enabled = true
+    check_interval_secs = 60
+    poll_interval_secs = 10
+    leader_ttl_secs = 30
+    leader_check_interval_secs = 15
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: arcana-jobs-secrets
+  labels:
+    app: arcana
+    component: jobs
+type: Opaque
+stringData:
+  # Redis URL - update for production
+  redis-url: "redis://arcana-jobs-redis:6379"
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcana-jobs
+  labels:
+    app: arcana
+    component: jobs
+spec:
+  selector:
+    matchLabels:
+      app: arcana
+  namespaceSelector:
+    matchNames:
+      - default
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scheme: http
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcana-jobs-alerts
+  labels:
+    app: arcana
+    component: jobs
+spec:
+  groups:
+    - name: arcana-jobs
+      rules:
+        # High pending jobs
+        - alert: ArcanaJobsHighPending
+          expr: sum(arcana_jobs_pending) > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High number of pending jobs"
+            description: "There are {{ $value }} pending jobs, which may indicate processing bottleneck."
+
+        # DLQ growing
+        - alert: ArcanaJobsDLQGrowing
+          expr: rate(arcana_jobs_dead_lettered_total[5m]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Dead letter queue is growing"
+            description: "Jobs are being dead-lettered at {{ $value }} per second."
+
+        # High failure rate
+        - alert: ArcanaJobsHighFailureRate
+          expr: |
+            sum(rate(arcana_jobs_failed_total[5m])) /
+            sum(rate(arcana_jobs_completed_total[5m]) + rate(arcana_jobs_failed_total[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High job failure rate"
+            description: "Job failure rate is {{ $value | humanizePercentage }}."
+
+        # No active workers
+        - alert: ArcanaJobsNoWorkers
+          expr: sum(arcana_workers_active) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No active job workers"
+            description: "No job workers are currently active."
+
+        # Scheduler not leader
+        - alert: ArcanaJobsNoSchedulerLeader
+          expr: sum(arcana_scheduler_is_leader) == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "No scheduler leader elected"
+            description: "No scheduler instance has acquired leadership."
+
+        # Long job execution
+        - alert: ArcanaJobsLongExecution
+          expr: histogram_quantile(0.99, rate(arcana_job_duration_seconds_bucket[5m])) > 300
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Jobs taking too long to execute"
+            description: "99th percentile job duration is {{ $value }}s."
+---
+# PodDisruptionBudget for workers
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcana-job-worker-pdb
+  labels:
+    app: arcana
+    component: job-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: arcana
+      component: job-worker
+---
+# NetworkPolicy for job components
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: arcana-jobs-network-policy
+  labels:
+    app: arcana
+    component: jobs
+spec:
+  podSelector:
+    matchLabels:
+      app: arcana
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow metrics scraping from Prometheus
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow health checks
+    - ports:
+        - protocol: TCP
+          port: 8081
+  egress:
+    # Allow Redis access
+    - to:
+        - podSelector:
+            matchLabels:
+              component: jobs-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53

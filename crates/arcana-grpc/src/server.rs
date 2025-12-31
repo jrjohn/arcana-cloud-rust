@@ -1,14 +1,18 @@
 //! gRPC server setup.
 
-use crate::proto::{auth, health, repository, user};
-use crate::services::{AuthGrpcService, HealthServiceImpl, RepositoryGrpcService, UserGrpcService};
-use arcana_config::ServerConfig;
+use crate::proto::{auth, health, jobs, repository, user};
+use crate::services::{
+    AuthGrpcService, HealthServiceImpl, JobQueueServiceImpl, RepositoryGrpcService,
+    UserGrpcService, WorkerServiceImpl,
+};
+use crate::tls::TlsConfigBuilder;
+use arcana_config::{SecurityConfig, ServerConfig};
 use arcana_core::ArcanaResult;
 use arcana_repository::UserRepository;
 use arcana_service::{AuthService, UserService};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tonic::transport::Server;
+use tonic::transport::{Server, ServerTlsConfig};
 use tracing::info;
 
 /// gRPC server builder for service layer (exposes UserService and AuthService).
@@ -16,6 +20,7 @@ pub struct GrpcServer {
     addr: SocketAddr,
     user_service: Arc<dyn UserService>,
     auth_service: Arc<dyn AuthService>,
+    tls_config: Option<ServerTlsConfig>,
 }
 
 impl GrpcServer {
@@ -33,22 +38,60 @@ impl GrpcServer {
             addr,
             user_service,
             auth_service,
+            tls_config: None,
+        })
+    }
+
+    /// Creates a new gRPC server with TLS configuration.
+    pub fn with_tls(
+        config: &ServerConfig,
+        security_config: &SecurityConfig,
+        user_service: Arc<dyn UserService>,
+        auth_service: Arc<dyn AuthService>,
+    ) -> ArcanaResult<Self> {
+        let addr = config.grpc_addr().parse().map_err(|e| {
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+        })?;
+
+        let tls_config = TlsConfigBuilder::from_security_config(security_config)?
+            .map(|builder| builder.build_server_config())
+            .transpose()?;
+
+        Ok(Self {
+            addr,
+            user_service,
+            auth_service,
+            tls_config,
         })
     }
 
     /// Starts the gRPC server.
     pub async fn serve(self) -> ArcanaResult<()> {
-        info!("Starting gRPC server on {}", self.addr);
+        let tls_status = if self.tls_config.is_some() { "with TLS" } else { "without TLS" };
+        info!("Starting gRPC server on {} {}", self.addr, tls_status);
 
         // Create service implementations
         let health_service = HealthServiceImpl::new();
         let user_grpc_service = UserGrpcService::new(self.user_service);
         let auth_grpc_service = AuthGrpcService::new(self.auth_service);
+        let job_queue_service = JobQueueServiceImpl::new();
+        let worker_service = WorkerServiceImpl::new();
 
-        Server::builder()
+        let mut builder = Server::builder();
+
+        // Apply TLS if configured
+        if let Some(tls_config) = self.tls_config {
+            builder = builder.tls_config(tls_config).map_err(|e| {
+                arcana_core::ArcanaError::Configuration(format!("Failed to configure TLS: {}", e))
+            })?;
+        }
+
+        builder
             .add_service(health::health_server::HealthServer::new(health_service))
             .add_service(user::user_service_server::UserServiceServer::new(user_grpc_service))
             .add_service(auth::auth_service_server::AuthServiceServer::new(auth_grpc_service))
+            .add_service(jobs::v1::job_queue_service_server::JobQueueServiceServer::new(job_queue_service))
+            .add_service(jobs::v1::worker_service_server::WorkerServiceServer::new(worker_service))
             .serve(self.addr)
             .await
             .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {}", e)))?;
@@ -61,6 +104,7 @@ impl GrpcServer {
 pub struct RepositoryGrpcServer {
     addr: SocketAddr,
     user_repository: Arc<dyn UserRepository>,
+    tls_config: Option<ServerTlsConfig>,
 }
 
 impl RepositoryGrpcServer {
@@ -76,17 +120,49 @@ impl RepositoryGrpcServer {
         Ok(Self {
             addr,
             user_repository,
+            tls_config: None,
+        })
+    }
+
+    /// Creates a new repository gRPC server with TLS configuration.
+    pub fn with_tls(
+        config: &ServerConfig,
+        security_config: &SecurityConfig,
+        user_repository: Arc<dyn UserRepository>,
+    ) -> ArcanaResult<Self> {
+        let addr = config.grpc_addr().parse().map_err(|e| {
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+        })?;
+
+        let tls_config = TlsConfigBuilder::from_security_config(security_config)?
+            .map(|builder| builder.build_server_config())
+            .transpose()?;
+
+        Ok(Self {
+            addr,
+            user_repository,
+            tls_config,
         })
     }
 
     /// Starts the repository gRPC server.
     pub async fn serve(self) -> ArcanaResult<()> {
-        info!("Starting Repository gRPC server on {}", self.addr);
+        let tls_status = if self.tls_config.is_some() { "with TLS" } else { "without TLS" };
+        info!("Starting Repository gRPC server on {} {}", self.addr, tls_status);
 
         let health_service = HealthServiceImpl::new();
         let repository_service = RepositoryGrpcService::new(self.user_repository);
 
-        Server::builder()
+        let mut builder = Server::builder();
+
+        // Apply TLS if configured
+        if let Some(tls_config) = self.tls_config {
+            builder = builder.tls_config(tls_config).map_err(|e| {
+                arcana_core::ArcanaError::Configuration(format!("Failed to configure TLS: {}", e))
+            })?;
+        }
+
+        builder
             .add_service(health::health_server::HealthServer::new(health_service))
             .add_service(
                 repository::repository_service_server::RepositoryServiceServer::new(

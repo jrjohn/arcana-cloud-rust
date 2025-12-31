@@ -9,8 +9,8 @@ build = "build.rs"
 
 [dependencies]
 arcana-core.workspace = true
-arcana-domain.workspace = true
 arcana-config.workspace = true
+arcana-jobs.workspace = true
 arcana-repository.workspace = true
 arcana-security.workspace = true
 arcana-service.workspace = true
@@ -25,9 +25,11 @@ tokio = { workspace = true, features = ["sync"] }
 tokio-stream = "0.1"
 async-trait.workspace = true
 reqwest = { version = "0.12", features = ["json"] }
+shaku.workspace = true
 
 [build-dependencies]
 tonic-build.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tempfile = "3.14"

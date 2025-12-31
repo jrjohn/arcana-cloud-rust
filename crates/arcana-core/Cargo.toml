@@ -17,10 +17,20 @@ chrono.workspace = true
 sqlx = { workspace = true, optional = true }
 validator.workspace = true
 shaku.workspace = true
+tracing.workspace = true
+opentelemetry = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+opentelemetry-otlp = { workspace = true, optional = true }
+opentelemetry-semantic-conventions = { workspace = true, optional = true }
+tracing-opentelemetry = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+utoipa = { workspace = true, optional = true }
 
 [features]
 default = ["sqlx"]
 sqlx = ["dep:sqlx"]
+telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:tracing-opentelemetry", "dep:tracing-subscriber"]
+openapi = ["dep:utoipa"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

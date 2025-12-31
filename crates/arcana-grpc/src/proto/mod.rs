@@ -30,3 +30,10 @@ pub mod health {
 pub mod repository {
     include!(concat!(env!("OUT_DIR"), "/arcana.repository.rs"));
 }
+
+/// Job queue service definitions.
+pub mod jobs {
+    pub mod v1 {
+        include!(concat!(env!("OUT_DIR"), "/arcana.jobs.v1.rs"));
+    }
+}

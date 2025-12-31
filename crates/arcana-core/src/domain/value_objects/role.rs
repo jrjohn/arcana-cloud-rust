@@ -5,6 +5,7 @@ use std::fmt;
 
 /// User roles with hierarchical permissions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum UserRole {
     /// Regular user with basic permissions.

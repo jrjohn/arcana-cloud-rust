@@ -4,7 +4,7 @@
 
 use crate::proto::{common, repository, user as user_proto};
 use arcana_core::{Page, PageRequest, UserId};
-use arcana_domain::{Email, User, UserRole, UserStatus};
+use arcana_core::{Email, User, UserRole, UserStatus};
 use arcana_repository::UserRepository;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};

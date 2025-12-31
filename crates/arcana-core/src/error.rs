@@ -267,6 +267,7 @@ impl From<serde_json::Error> for ArcanaError {
 
 /// Serializable error response for API responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ErrorResponse {
     /// Machine-readable error code
     pub code: String,
@@ -282,6 +283,7 @@ pub struct ErrorResponse {
 
 /// Field-level validation error.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct FieldError {
     /// Field name
     pub field: String,

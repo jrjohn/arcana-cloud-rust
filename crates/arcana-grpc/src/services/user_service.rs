@@ -297,42 +297,42 @@ fn to_proto_user(user: &arcana_service::dto::UserResponse) -> user::User {
     }
 }
 
-fn to_proto_role(role: arcana_domain::UserRole) -> user::UserRole {
+fn to_proto_role(role: arcana_core::UserRole) -> user::UserRole {
     match role {
-        arcana_domain::UserRole::User => user::UserRole::User,
-        arcana_domain::UserRole::Moderator => user::UserRole::Moderator,
-        arcana_domain::UserRole::Admin => user::UserRole::Admin,
-        arcana_domain::UserRole::SuperAdmin => user::UserRole::SuperAdmin,
+        arcana_core::UserRole::User => user::UserRole::User,
+        arcana_core::UserRole::Moderator => user::UserRole::Moderator,
+        arcana_core::UserRole::Admin => user::UserRole::Admin,
+        arcana_core::UserRole::SuperAdmin => user::UserRole::SuperAdmin,
     }
 }
 
-fn from_proto_role(role: user::UserRole) -> arcana_domain::UserRole {
+fn from_proto_role(role: user::UserRole) -> arcana_core::UserRole {
     match role {
-        user::UserRole::User | user::UserRole::Unspecified => arcana_domain::UserRole::User,
-        user::UserRole::Moderator => arcana_domain::UserRole::Moderator,
-        user::UserRole::Admin => arcana_domain::UserRole::Admin,
-        user::UserRole::SuperAdmin => arcana_domain::UserRole::SuperAdmin,
+        user::UserRole::User | user::UserRole::Unspecified => arcana_core::UserRole::User,
+        user::UserRole::Moderator => arcana_core::UserRole::Moderator,
+        user::UserRole::Admin => arcana_core::UserRole::Admin,
+        user::UserRole::SuperAdmin => arcana_core::UserRole::SuperAdmin,
     }
 }
 
-fn to_proto_status(status: arcana_domain::UserStatus) -> user::UserStatus {
+fn to_proto_status(status: arcana_core::UserStatus) -> user::UserStatus {
     match status {
-        arcana_domain::UserStatus::PendingVerification => user::UserStatus::PendingVerification,
-        arcana_domain::UserStatus::Active => user::UserStatus::Active,
-        arcana_domain::UserStatus::Suspended => user::UserStatus::Suspended,
-        arcana_domain::UserStatus::Locked => user::UserStatus::Locked,
-        arcana_domain::UserStatus::Deleted => user::UserStatus::Deleted,
+        arcana_core::UserStatus::PendingVerification => user::UserStatus::PendingVerification,
+        arcana_core::UserStatus::Active => user::UserStatus::Active,
+        arcana_core::UserStatus::Suspended => user::UserStatus::Suspended,
+        arcana_core::UserStatus::Locked => user::UserStatus::Locked,
+        arcana_core::UserStatus::Deleted => user::UserStatus::Deleted,
     }
 }
 
-fn from_proto_status(status: user::UserStatus) -> arcana_domain::UserStatus {
+fn from_proto_status(status: user::UserStatus) -> arcana_core::UserStatus {
     match status {
         user::UserStatus::Unspecified | user::UserStatus::PendingVerification => {
-            arcana_domain::UserStatus::PendingVerification
+            arcana_core::UserStatus::PendingVerification
         }
-        user::UserStatus::Active => arcana_domain::UserStatus::Active,
-        user::UserStatus::Suspended => arcana_domain::UserStatus::Suspended,
-        user::UserStatus::Locked => arcana_domain::UserStatus::Locked,
-        user::UserStatus::Deleted => arcana_domain::UserStatus::Deleted,
+        user::UserStatus::Active => arcana_core::UserStatus::Active,
+        user::UserStatus::Suspended => arcana_core::UserStatus::Suspended,
+        user::UserStatus::Locked => arcana_core::UserStatus::Locked,
+        user::UserStatus::Deleted => arcana_core::UserStatus::Deleted,
     }
 }

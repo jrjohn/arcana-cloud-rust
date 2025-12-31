@@ -1,7 +1,7 @@
 //! # Arcana Domain
 //!
 //! Domain entities, value objects, and events for Arcana Cloud Rust.
-//! This crate contains the core business concepts of the application.
+//! This module contains the core business concepts of the application.
 
 pub mod entities;
 pub mod events;

@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: arcana-jobs
+
+namespace: default
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: arcana-jobs
+      app.kubernetes.io/part-of: arcana
+      app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - redis-deployment.yaml
+  - worker-deployment.yaml
+  - scheduler-deployment.yaml
+  - config.yaml
+
+configMapGenerator:
+  - name: arcana-jobs-env
+    literals:
+      - RUST_LOG=info,arcana=debug
+      - APP__MODE=worker
+
+images:
+  - name: arcana-server
+    newTag: latest
+
+# Common labels for all resources
+commonLabels:
+  app: arcana
+  environment: development
+
+# Patches for development/production
+patches: []
+
+# Replicas can be overridden in overlays
+replicas:
+  - name: arcana-job-worker
+    count: 2
+  - name: arcana-job-scheduler
+    count: 2

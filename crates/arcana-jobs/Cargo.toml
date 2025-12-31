@@ -1,0 +1,41 @@
+[package]
+name = "arcana-jobs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Distributed job queue system for Arcana Cloud"
+
+[dependencies]
+# Core
+arcana-core.workspace = true
+arcana-config.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Redis
+redis.workspace = true
+deadpool-redis.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Cron scheduling
+cron.workspace = true
+chrono.workspace = true
+
+# Utilities
+uuid.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+shaku.workspace = true
+
+# Metrics
+metrics.workspace = true
+
+[dev-dependencies]
+tokio-test.workspace = true

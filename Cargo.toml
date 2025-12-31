@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "crates/arcana-core",
-    "crates/arcana-domain",
     "crates/arcana-repository",
     "crates/arcana-service",
     "crates/arcana-rest",
@@ -13,6 +12,7 @@ members = [
     "crates/arcana-plugin-runtime",
     "crates/arcana-ssr-engine",
     "crates/arcana-resilience",
+    "crates/arcana-jobs",
     "crates/arcana-server",
     "plugins/arcana-audit-plugin",
 ]
@@ -48,6 +48,13 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres",
 
 # Redis
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+deadpool-redis = "0.18"
+
+# Cron scheduling
+cron = "0.13"
+
+# Locking
+parking_lot = "0.12"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -74,6 +81,11 @@ backoff = { version = "0.4", features = ["tokio"] }
 # Observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.28"
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
+opentelemetry-semantic-conventions = "0.27"
 metrics = "0.24"
 metrics-exporter-prometheus = "0.16"
 
@@ -87,11 +99,15 @@ anyhow = "1.0"
 # Validation
 validator = { version = "0.19", features = ["derive"] }
 
+# OpenAPI Documentation
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "8", features = ["axum"] }
+
 # Async traits
 async-trait = "0.1"
 
 # Dependency Injection
-shaku = { version = "0.6", features = ["derive"] }
+shaku = { version = "0.6", features = ["derive", "thread_safe"] }
 shaku_axum = "0.3"
 
 # Futures
@@ -106,7 +122,6 @@ criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 
 # Internal crates
 arcana-core = { path = "crates/arcana-core" }
-arcana-domain = { path = "crates/arcana-domain" }
 arcana-repository = { path = "crates/arcana-repository" }
 arcana-service = { path = "crates/arcana-service" }
 arcana-rest = { path = "crates/arcana-rest" }
@@ -117,6 +132,7 @@ arcana-plugin-api = { path = "crates/arcana-plugin-api" }
 arcana-plugin-runtime = { path = "crates/arcana-plugin-runtime" }
 arcana-ssr-engine = { path = "crates/arcana-ssr-engine" }
 arcana-resilience = { path = "crates/arcana-resilience" }
+arcana-jobs = { path = "crates/arcana-jobs" }
 
 [workspace.lints.rust]
 unsafe_code = "warn"

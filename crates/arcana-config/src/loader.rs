@@ -1,5 +1,6 @@
 //! Configuration loader with layered sources.
 
+use crate::validation::{format_validation_errors, ConfigValidator};
 use crate::AppConfig;
 use arcana_core::ArcanaError;
 use config::{Config, ConfigError, Environment, File};
@@ -118,36 +119,23 @@ impl ConfigLoader {
         Ok(app_config)
     }
 
-    /// Validates the configuration.
+    /// Validates the configuration using comprehensive validation rules.
     fn validate_config(config: &AppConfig) -> Result<(), ArcanaError> {
-        // Warn about default JWT secret in production
-        if config.app.environment == "production" && config.security.jwt_secret == "change-me-in-production" {
-            warn!("Using default JWT secret in production! This is a security risk.");
+        // Run comprehensive validation
+        if let Err(errors) = ConfigValidator::validate(config) {
+            return Err(ArcanaError::Configuration(format_validation_errors(&errors)));
         }
 
-        // Validate database URL
-        if config.database.url.is_empty() {
-            return Err(ArcanaError::Configuration("Database URL is required".to_string()));
-        }
-
-        // Validate layered deployment configuration
-        if config.deployment.mode.is_layered() {
-            match config.deployment.layer {
-                crate::DeploymentLayer::Controller => {
-                    if config.deployment.service_url.is_none() {
-                        return Err(ArcanaError::Configuration(
-                            "Service URL is required for controller layer in layered deployment".to_string(),
-                        ));
-                    }
-                }
-                crate::DeploymentLayer::Service => {
-                    if config.deployment.repository_url.is_none() {
-                        return Err(ArcanaError::Configuration(
-                            "Repository URL is required for service layer in layered deployment".to_string(),
-                        ));
-                    }
-                }
-                _ => {}
+        // Production-specific warnings (non-fatal)
+        if config.app.environment == "production" {
+            if config.security.jwt_secret.starts_with("change-me") {
+                warn!("Using default JWT secret in production! This is a security risk.");
+            }
+            if !config.security.grpc_tls_enabled {
+                warn!("gRPC TLS is disabled in production. Consider enabling it for security.");
+            }
+            if config.observability.sampling_ratio < 0.01 {
+                warn!("Very low trace sampling ratio in production. Consider increasing for better observability.");
             }
         }
 

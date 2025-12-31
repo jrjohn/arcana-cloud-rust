@@ -8,7 +8,6 @@ description = "Repository implementations for Arcana Cloud Rust using SQLx"
 
 [dependencies]
 arcana-core.workspace = true
-arcana-domain.workspace = true
 arcana-config.workspace = true
 sqlx.workspace = true
 async-trait.workspace = true
@@ -22,3 +21,5 @@ shaku.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+testcontainers = { workspace = true }
+testcontainers-modules = { version = "0.11", features = ["mysql"] }

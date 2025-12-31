@@ -128,7 +128,7 @@ impl AuthService for RemoteAuthServiceClient {
         let role = inner
             .role
             .map(|r| from_proto_role(user_proto::UserRole::try_from(r).unwrap_or(user_proto::UserRole::User)))
-            .unwrap_or(arcana_domain::UserRole::User);
+            .unwrap_or(arcana_core::UserRole::User);
         let expires_at = inner.expires_at.unwrap_or(0);
 
         Ok(Claims::new_access(
@@ -217,18 +217,18 @@ fn from_proto_auth_response(response: auth::AuthResponse) -> AuthResponse {
             id: UserId::new(),
             username: String::new(),
             email: String::new(),
-            role: arcana_domain::UserRole::User,
+            role: arcana_core::UserRole::User,
             first_name: None,
             last_name: None,
         }),
     }
 }
 
-fn from_proto_role(role: user_proto::UserRole) -> arcana_domain::UserRole {
+fn from_proto_role(role: user_proto::UserRole) -> arcana_core::UserRole {
     match role {
-        user_proto::UserRole::User | user_proto::UserRole::Unspecified => arcana_domain::UserRole::User,
-        user_proto::UserRole::Moderator => arcana_domain::UserRole::Moderator,
-        user_proto::UserRole::Admin => arcana_domain::UserRole::Admin,
-        user_proto::UserRole::SuperAdmin => arcana_domain::UserRole::SuperAdmin,
+        user_proto::UserRole::User | user_proto::UserRole::Unspecified => arcana_core::UserRole::User,
+        user_proto::UserRole::Moderator => arcana_core::UserRole::Moderator,
+        user_proto::UserRole::Admin => arcana_core::UserRole::Admin,
+        user_proto::UserRole::SuperAdmin => arcana_core::UserRole::SuperAdmin,
     }
 }

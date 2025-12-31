@@ -1,7 +1,7 @@
 //! JWT claims structure.
 
 use arcana_core::UserId;
-use arcana_domain::UserRole;
+use arcana_core::UserRole;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

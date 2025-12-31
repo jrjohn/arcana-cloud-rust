@@ -5,6 +5,7 @@ use std::fmt;
 
 /// User account status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum UserStatus {
     /// User is pending email verification.

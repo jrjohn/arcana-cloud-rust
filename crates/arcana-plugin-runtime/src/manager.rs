@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Plugin manager for loading and managing WASM plugins.
 pub struct PluginManager {

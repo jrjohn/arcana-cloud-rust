@@ -1,8 +1,7 @@
 //! Circuit breaker implementation.
 
-use arcana_core::{ArcanaError, ArcanaResult};
+use arcana_core::ArcanaError;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
