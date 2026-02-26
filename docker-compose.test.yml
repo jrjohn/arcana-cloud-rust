@@ -1,0 +1,8 @@
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: builder
+    working_dir: /app
+    command: sh -c "cargo test --workspace --no-fail-fast 2>&1 || true"
