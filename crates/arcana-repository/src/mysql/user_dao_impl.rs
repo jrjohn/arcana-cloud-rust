@@ -94,7 +94,7 @@ fn parse_role(s: &str) -> UserRole {
 
 fn parse_status(s: &str) -> UserStatus {
     match s.to_lowercase().as_str() {
-        "inactive" => UserStatus::Inactive,
+        "pending_verification" => UserStatus::PendingVerification,
         "suspended" => UserStatus::Suspended,
         "locked" => UserStatus::Locked,
         "deleted" => UserStatus::Deleted,
