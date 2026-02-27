@@ -8,7 +8,11 @@
 use arcana_config::{DatabaseConfig, RedisConfig, SecurityConfig, SecurityConfigInterface};
 use arcana_core::{module, ArcanaResult, HasComponent};
 use arcana_grpc::RemoteUserRepository;
-use arcana_repository::{DatabasePool, DatabasePoolInterface, MySqlUserRepository, UserRepository};
+use arcana_repository::{
+    DatabasePool, DatabasePoolInterface,
+    MySqlUserDaoImpl, MySqlUserRepository,
+    UserDao, UserRepository, UserRepositoryImpl,
+};
 use arcana_security::{PasswordHasher, PasswordHasherInterface, TokenProvider, TokenProviderInterface};
 use arcana_service::{AuthService, AuthServiceComponent, CacheInterface, RedisCacheService, RedisCacheServiceParameters, UserService, UserServiceComponent};
 use std::sync::Arc;
@@ -19,10 +23,13 @@ use std::sync::Arc;
 
 // Monolithic deployment module with local MySQL database.
 // Contains all components for a single-process deployment:
-// - Database pool and repository
+// - Database pool → MySqlUserDaoImpl (DAO) → UserRepositoryImpl (Repository)
 // - Security components (password hashing, JWT tokens)
 // - Caching (Redis)
 // - Business services (user, auth)
+//
+// 4-layer hierarchy within this module:
+//   Service → UserRepository (trait) → UserRepositoryImpl → UserDao → MySqlUserDaoImpl → MySQL
 module! {
     pub MonolithicModule {
         components = [
@@ -30,7 +37,8 @@ module! {
             PasswordHasher,
             TokenProvider,
             SecurityConfig,
-            MySqlUserRepository,
+            MySqlUserDaoImpl,      // DAO layer (implements UserDao)
+            UserRepositoryImpl,    // Repository layer (implements UserRepository, injects UserDao)
             RedisCacheService,
             UserServiceComponent,
             AuthServiceComponent,
@@ -67,7 +75,8 @@ module! {
     pub RepositoryModule {
         components = [
             DatabasePool,
-            MySqlUserRepository,
+            MySqlUserDaoImpl,   // DAO layer
+            UserRepositoryImpl, // Repository layer
         ],
         providers = [],
     }

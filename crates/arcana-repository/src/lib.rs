@@ -1,16 +1,33 @@
 //! # Arcana Repository
 //!
-//! Repository implementations for Arcana Cloud Rust using SQLx.
-//! Provides database access layer with MySQL support.
+//! Four-layer data access hierarchy:
+//!
+//! ```text
+//! Service
+//!   ↓  Arc<dyn UserRepository>  (domain interface)
+//! UserRepositoryImpl            (repository impl — coordinates DAOs)
+//!   ↓  Arc<dyn UserDao>         (DAO interface)
+//! MySqlUserDaoImpl              (DAO impl — MySQL / SQLx)
+//!   ↓
+//! MySQL
+//! ```
+//!
+//! The existing [`MySqlUserRepository`] is retained for backward
+//! compatibility and for direct use in the distributed gRPC module.
 
+pub mod dao;
 pub mod pool;
 pub mod mysql;
 pub mod traits;
 
+mod user_repository_impl;
+
+pub use dao::UserDao;
 pub use pool::*;
 pub use traits::*;
+pub use user_repository_impl::UserRepositoryImpl;
 
-// Re-export MySQL implementations as default
+// Re-export MySQL implementations
 pub use mysql::*;
 
 #[cfg(test)]
