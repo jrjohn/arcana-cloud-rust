@@ -12,6 +12,22 @@
 //! MySQL
 //! ```
 //!
+//! ## Structure
+//!
+//! ```text
+//! src/
+//!   traits.rs                    ← UserRepository trait
+//!   impl/
+//!     mod.rs
+//!     user_repository_impl.rs    ← UserRepositoryImpl
+//!   dao/
+//!     user_dao.rs                ← UserDao trait
+//!     impl/
+//!       mod.rs
+//!       mysql/
+//!         user_dao_impl.rs       ← MySqlUserDaoImpl
+//! ```
+//!
 //! The existing [`MySqlUserRepository`] is retained for backward
 //! compatibility and for direct use in the distributed gRPC module.
 
@@ -19,15 +35,15 @@ pub mod dao;
 pub mod pool;
 pub mod mysql;
 pub mod traits;
-
-mod user_repository_impl;
+pub mod r#impl;
 
 pub use dao::UserDao;
 pub use pool::*;
 pub use traits::*;
-pub use user_repository_impl::UserRepositoryImpl;
+pub use r#impl::UserRepositoryImpl;
 
-// Re-export MySQL implementations
+// Re-export DAO and MySQL implementations for convenience
+pub use dao::MySqlUserDaoImpl;
 pub use mysql::*;
 
 #[cfg(test)]
