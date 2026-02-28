@@ -306,8 +306,8 @@ mod tests {
         let result = cb.call(|| async { Err::<i32, &str>("some error") }).await;
         assert!(result.is_err());
         match result {
-            Err(CircuitBreakerError::Inner(_)) => {},
-            other => panic!("Expected Inner error, got {:?}", other),
+            Err(CircuitBreakerError::Failure(_)) => {},
+            other => panic!("Expected Failure error, got {:?}", other),
         }
     }
 
