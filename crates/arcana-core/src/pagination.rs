@@ -198,6 +198,25 @@ mod tests {
     }
 
     #[test]
+    fn test_page_request_first() {
+        let req = PageRequest::first();
+        assert_eq!(req.page, 0);
+        assert_eq!(req.offset(), 0);
+    }
+
+    #[test]
+    fn test_page_request_offset_calculation() {
+        let req = PageRequest::new(0, 20);
+        assert_eq!(req.offset(), 0);
+
+        let req2 = PageRequest::new(1, 20);
+        assert_eq!(req2.offset(), 20);
+
+        let req3 = PageRequest::new(5, 15);
+        assert_eq!(req3.offset(), 75);
+    }
+
+    #[test]
     fn test_page_info() {
         let page: Page<i32> = Page::new(vec![1, 2, 3], 0, 10, 25);
         assert!(page.info.first);
@@ -208,9 +227,50 @@ mod tests {
     }
 
     #[test]
+    fn test_page_info_last_page() {
+        let page: Page<i32> = Page::new(vec![1, 2], 2, 10, 22);
+        assert!(!page.info.first);
+        assert!(page.info.last);
+        assert!(!page.has_next());
+        assert!(page.has_previous());
+    }
+
+    #[test]
     fn test_page_map() {
         let page = Page::new(vec![1, 2, 3], 0, 10, 3);
         let mapped = page.map(|x| x * 2);
         assert_eq!(mapped.content, vec![2, 4, 6]);
+    }
+
+    #[test]
+    fn test_page_empty() {
+        let page: Page<i32> = Page::empty(0, 10);
+        assert!(page.is_empty());
+        assert_eq!(page.len(), 0);
+        assert_eq!(page.total_elements(), 0);
+        assert_eq!(page.total_pages(), 0);
+    }
+
+    #[test]
+    fn test_page_is_not_empty() {
+        let page = Page::new(vec![1, 2, 3], 0, 10, 3);
+        assert!(!page.is_empty());
+        assert_eq!(page.len(), 3);
+    }
+
+    #[test]
+    fn test_page_total_elements_and_pages() {
+        let page: Page<i32> = Page::new(vec![1], 0, 5, 11);
+        assert_eq!(page.total_elements(), 11);
+        assert_eq!(page.total_pages(), 3); // ceil(11/5) = 3
+    }
+
+    #[test]
+    fn test_page_single_page() {
+        let page = Page::new(vec![1, 2, 3], 0, 10, 3);
+        assert!(page.info.first);
+        assert!(page.info.last);
+        assert!(!page.has_next());
+        assert!(!page.has_previous());
     }
 }

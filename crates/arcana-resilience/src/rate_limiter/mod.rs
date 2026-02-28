@@ -81,4 +81,44 @@ mod tests {
         limiter.wait().await;
         // Should complete quickly with high limit
     }
+
+    #[test]
+    fn test_rate_limiter_clone() {
+        let limiter = RateLimiter::new(10);
+        let cloned = limiter.clone();
+        assert!(cloned.check().is_ok());
+    }
+
+    #[test]
+    fn test_rate_limiter_debug() {
+        let limiter = RateLimiter::new(10);
+        let debug = format!("{:?}", limiter);
+        assert!(debug.contains("RateLimiter"));
+    }
+
+    #[test]
+    fn test_rate_limiter_per_minute() {
+        let limiter = RateLimiter::per_minute(60);
+        assert!(limiter.check().is_ok());
+    }
+
+    #[test]
+    fn test_rate_limiter_exhausted() {
+        // Very low limit - 1 request per second
+        // With a burst of requests, it should eventually fail
+        let limiter = RateLimiter::new(1);
+        let _ = limiter.check(); // Consume the token
+        // Second check should fail (no burst capacity in strict mode)
+        // Governor may allow burst, so we try multiple times
+        let results: Vec<bool> = (0..5).map(|_| limiter.check().is_err()).collect();
+        // At least one should fail
+        assert!(results.iter().any(|&failed| failed));
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiter_check_with_wait() {
+        let limiter = RateLimiter::new(1000);
+        let result = limiter.check_with_wait().await;
+        assert!(result.is_ok());
+    }
 }

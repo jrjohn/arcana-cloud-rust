@@ -163,7 +163,7 @@ fn config_error_to_arcana_error(err: ConfigError) -> ArcanaError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ServerConfig;
+    use crate::{AppConfig, DatabaseConfig, PluginConfig, SecurityConfig, ServerConfig};
 
     #[tokio::test]
     async fn test_default_config() {
@@ -178,5 +178,70 @@ mod tests {
         let config = ServerConfig::default();
         assert_eq!(config.rest_addr(), "0.0.0.0:8080");
         assert_eq!(config.grpc_addr(), "0.0.0.0:9090");
+    }
+
+    #[test]
+    fn test_server_config_custom_ports() {
+        let mut config = ServerConfig::default();
+        config.rest_port = 3000;
+        config.grpc_port = 4000;
+        assert_eq!(config.rest_addr(), "0.0.0.0:3000");
+        assert_eq!(config.grpc_addr(), "0.0.0.0:4000");
+    }
+
+    #[test]
+    fn test_server_config_custom_host() {
+        let config = ServerConfig {
+            rest_host: "127.0.0.1".to_string(),
+            grpc_host: "127.0.0.1".to_string(),
+            rest_port: 8080,
+            grpc_port: 9090,
+            ..Default::default()
+        };
+        assert_eq!(config.rest_addr(), "127.0.0.1:8080");
+        assert_eq!(config.grpc_addr(), "127.0.0.1:9090");
+    }
+
+    #[test]
+    fn test_database_config_default() {
+        let config = DatabaseConfig::default();
+        assert!(config.max_connections > 0);
+        assert!(config.min_connections >= 0);
+    }
+
+    #[test]
+    fn test_security_config_default() {
+        let config = SecurityConfig::default();
+        assert!(!config.jwt_secret.is_empty());
+        assert!(!config.jwt_issuer.is_empty());
+        assert!(!config.jwt_audience.is_empty());
+        assert!(config.jwt_access_expiration_secs > 0);
+        assert!(config.jwt_refresh_expiration_secs > 0);
+    }
+
+    #[test]
+    fn test_plugin_config_default() {
+        let config = PluginConfig::default();
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn test_app_config_default_environment() {
+        let config = AppConfig::default();
+        assert_eq!(config.app.environment, "development");
+    }
+
+    #[test]
+    fn test_app_config_default_name() {
+        let config = AppConfig::default();
+        assert!(!config.app.name.is_empty());
+    }
+
+    #[test]
+    fn test_config_loader_invalid_dir() {
+        let result = ConfigLoader::new("/nonexistent/path/config");
+        // Should either succeed (file not required) or fail with a meaningful error
+        // The important thing is it doesn't panic
+        let _ = result;
     }
 }

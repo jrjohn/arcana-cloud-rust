@@ -266,6 +266,13 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_circuit_breaker_initial_state() {
+        let cb = CircuitBreaker::with_defaults("test");
+        assert_eq!(cb.state(), CircuitState::Closed);
+        assert_eq!(cb.name(), "test");
+    }
+
+    #[tokio::test]
     async fn test_circuit_breaker_opens_on_failures() {
         let config = CircuitBreakerConfig {
             failure_threshold: 2,
@@ -284,5 +291,59 @@ mod tests {
         // Third call should be rejected
         let result = cb.call(|| async { Ok::<i32, &str>(42) }).await;
         assert!(matches!(result, Err(CircuitBreakerError::Open(_))));
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_successful_call_returns_value() {
+        let cb = CircuitBreaker::with_defaults("test");
+        let result = cb.call(|| async { Ok::<i32, &str>(99) }).await;
+        assert_eq!(result.unwrap(), 99);
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_failure_returns_error() {
+        let cb = CircuitBreaker::with_defaults("test-failure");
+        let result = cb.call(|| async { Err::<i32, &str>("some error") }).await;
+        assert!(result.is_err());
+        match result {
+            Err(CircuitBreakerError::Inner(_)) => {},
+            other => panic!("Expected Inner error, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_circuit_state_from_u8() {
+        assert_eq!(CircuitState::from(0), CircuitState::Closed);
+        assert_eq!(CircuitState::from(1), CircuitState::Open);
+        assert_eq!(CircuitState::from(2), CircuitState::HalfOpen);
+        assert_eq!(CircuitState::from(255), CircuitState::Closed); // unknown -> Closed
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_single_failure_threshold_one() {
+        let config = CircuitBreakerConfig {
+            failure_threshold: 1,
+            ..Default::default()
+        };
+        let cb = CircuitBreaker::new("single-fail", config);
+
+        // Single failure should open
+        let _ = cb.call(|| async { Err::<i32, &str>("error") }).await;
+        assert_eq!(cb.state(), CircuitState::Open);
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_name() {
+        let cb = CircuitBreaker::with_defaults("my-service");
+        assert_eq!(cb.name(), "my-service");
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_config_default() {
+        let config = CircuitBreakerConfig::default();
+        assert_eq!(config.failure_threshold, 5);
+        assert_eq!(config.success_threshold, 3);
+        assert_eq!(config.half_open_requests, 3);
+        assert!(config.timeout.as_secs() > 0);
     }
 }

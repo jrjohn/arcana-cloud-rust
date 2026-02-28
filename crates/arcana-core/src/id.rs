@@ -202,6 +202,33 @@ mod tests {
     }
 
     #[test]
+    fn test_user_id_default() {
+        let id = UserId::default();
+        assert!(!id.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_user_id_from_uuid() {
+        let uuid = Uuid::now_v7();
+        let id = UserId::from_uuid(uuid);
+        assert_eq!(id.into_inner(), uuid);
+    }
+
+    #[test]
+    fn test_user_id_from_trait() {
+        let uuid = Uuid::now_v7();
+        let id: UserId = uuid.into();
+        assert_eq!(id.to_string(), uuid.to_string());
+    }
+
+    #[test]
+    fn test_user_id_into_uuid() {
+        let id = UserId::new();
+        let uuid: Uuid = id.into();
+        assert!(!uuid.to_string().is_empty());
+    }
+
+    #[test]
     fn test_user_id_parsing() {
         let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
         let id = UserId::parse(uuid_str).unwrap();
@@ -209,8 +236,110 @@ mod tests {
     }
 
     #[test]
+    fn test_user_id_parse_invalid() {
+        let result = UserId::parse("not-a-uuid");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_user_id_display() {
+        let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
+        let id = UserId::parse(uuid_str).unwrap();
+        assert_eq!(format!("{}", id), uuid_str);
+    }
+
+    #[test]
+    fn test_user_id_equality() {
+        let uuid = Uuid::now_v7();
+        let id1 = UserId::from_uuid(uuid);
+        let id2 = UserId::from_uuid(uuid);
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_user_id_clone_copy() {
+        let id1 = UserId::new();
+        let id2 = id1; // Copy
+        let id3 = id1; // Also copy
+        assert_eq!(id2, id3);
+    }
+
+    #[test]
+    fn test_user_id_serialization() {
+        let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
+        let id = UserId::parse(uuid_str).unwrap();
+        let json = serde_json::to_string(&id).unwrap();
+        let parsed: UserId = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, id);
+    }
+
+    #[test]
+    fn test_session_id_creation() {
+        let id1 = SessionId::new();
+        let id2 = SessionId::new();
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_session_id_default() {
+        let id = SessionId::default();
+        assert!(!id.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_session_id_display() {
+        let id = SessionId::new();
+        assert!(!id.to_string().is_empty());
+    }
+
+    #[test]
     fn test_plugin_id() {
         let id = PluginId::new("my-plugin");
         assert_eq!(id.as_str(), "my-plugin");
+    }
+
+    #[test]
+    fn test_plugin_id_from_string() {
+        let id: PluginId = "my-plugin".into();
+        assert_eq!(id.as_str(), "my-plugin");
+    }
+
+    #[test]
+    fn test_plugin_id_from_owned_string() {
+        let s = "my-plugin".to_string();
+        let id: PluginId = s.into();
+        assert_eq!(id.as_str(), "my-plugin");
+    }
+
+    #[test]
+    fn test_plugin_id_display() {
+        let id = PluginId::new("my-plugin");
+        assert_eq!(format!("{}", id), "my-plugin");
+    }
+
+    #[test]
+    fn test_oauth_token_id_creation() {
+        let id1 = OAuthTokenId::new();
+        let id2 = OAuthTokenId::new();
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_oauth_token_id_default() {
+        let id = OAuthTokenId::default();
+        assert!(!id.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_audit_log_id_creation() {
+        let id1 = AuditLogId::new();
+        let id2 = AuditLogId::new();
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_audit_log_id_default() {
+        let id = AuditLogId::default();
+        assert!(!id.to_string().is_empty());
     }
 }

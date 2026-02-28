@@ -93,6 +93,7 @@ mod tests {
         assert!(UserStatus::PendingVerification.can_login());
         assert!(!UserStatus::Suspended.can_login());
         assert!(!UserStatus::Locked.can_login());
+        assert!(!UserStatus::Deleted.can_login());
     }
 
     #[test]
@@ -100,5 +101,92 @@ mod tests {
         assert!(UserStatus::Active.can_act());
         assert!(!UserStatus::PendingVerification.can_act());
         assert!(!UserStatus::Suspended.can_act());
+        assert!(!UserStatus::Locked.can_act());
+        assert!(!UserStatus::Deleted.can_act());
+    }
+
+    #[test]
+    fn test_status_is_active() {
+        assert!(UserStatus::Active.is_active());
+        assert!(!UserStatus::PendingVerification.is_active());
+        assert!(!UserStatus::Suspended.is_active());
+        assert!(!UserStatus::Locked.is_active());
+        assert!(!UserStatus::Deleted.is_active());
+    }
+
+    #[test]
+    fn test_status_needs_attention() {
+        assert!(UserStatus::PendingVerification.needs_attention());
+        assert!(UserStatus::Locked.needs_attention());
+        assert!(!UserStatus::Active.needs_attention());
+        assert!(!UserStatus::Suspended.needs_attention());
+        assert!(!UserStatus::Deleted.needs_attention());
+    }
+
+    #[test]
+    fn test_status_description() {
+        assert!(!UserStatus::Active.description().is_empty());
+        assert!(!UserStatus::PendingVerification.description().is_empty());
+        assert!(!UserStatus::Suspended.description().is_empty());
+        assert!(!UserStatus::Locked.description().is_empty());
+        assert!(!UserStatus::Deleted.description().is_empty());
+    }
+
+    #[test]
+    fn test_status_description_content() {
+        assert!(UserStatus::Active.description().contains("active"));
+        assert!(UserStatus::PendingVerification.description().to_lowercase().contains("pending") || 
+                UserStatus::PendingVerification.description().to_lowercase().contains("verification"));
+        assert!(UserStatus::Suspended.description().to_lowercase().contains("suspend"));
+        assert!(UserStatus::Locked.description().to_lowercase().contains("lock"));
+        assert!(UserStatus::Deleted.description().to_lowercase().contains("delete"));
+    }
+
+    #[test]
+    fn test_status_all() {
+        let all = UserStatus::all();
+        assert_eq!(all.len(), 5);
+        assert!(all.contains(&UserStatus::PendingVerification));
+        assert!(all.contains(&UserStatus::Active));
+        assert!(all.contains(&UserStatus::Suspended));
+        assert!(all.contains(&UserStatus::Locked));
+        assert!(all.contains(&UserStatus::Deleted));
+    }
+
+    #[test]
+    fn test_status_display() {
+        assert_eq!(UserStatus::Active.to_string(), "active");
+        assert_eq!(UserStatus::PendingVerification.to_string(), "pending_verification");
+        assert_eq!(UserStatus::Suspended.to_string(), "suspended");
+        assert_eq!(UserStatus::Locked.to_string(), "locked");
+        assert_eq!(UserStatus::Deleted.to_string(), "deleted");
+    }
+
+    #[test]
+    fn test_status_serialization() {
+        let status = UserStatus::Active;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"active\"");
+        let parsed: UserStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, UserStatus::Active);
+    }
+
+    #[test]
+    fn test_status_default() {
+        let status = UserStatus::default();
+        assert_eq!(status, UserStatus::PendingVerification);
+    }
+
+    #[test]
+    fn test_status_equality() {
+        assert_eq!(UserStatus::Active, UserStatus::Active);
+        assert_ne!(UserStatus::Active, UserStatus::Suspended);
+    }
+
+    #[test]
+    fn test_status_clone() {
+        let status = UserStatus::Active;
+        let cloned = status;
+        assert_eq!(status, cloned);
     }
 }

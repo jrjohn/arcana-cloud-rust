@@ -144,4 +144,89 @@ mod tests {
         let result: Result<i32, &str> = policy.execute(|| async { Err("always fails") }).await;
         assert!(result.is_err());
     }
+
+    #[tokio::test]
+    async fn test_retry_counts_exact_attempts() {
+        let policy = RetryPolicy {
+            max_attempts: 3,
+            initial_delay: Duration::from_millis(1),
+            jitter: false,
+            ..Default::default()
+        };
+
+        let attempts = Arc::new(AtomicU32::new(0));
+        let attempts_clone = attempts.clone();
+
+        let result: Result<i32, &str> = policy
+            .execute(|| {
+                let a = attempts_clone.clone();
+                async move {
+                    a.fetch_add(1, Ordering::SeqCst);
+                    Err("fail")
+                }
+            })
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(attempts.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn test_delay_for_attempt_zero() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.delay_for_attempt(0), Duration::ZERO);
+    }
+
+    #[test]
+    fn test_delay_for_attempt_increases() {
+        let policy = RetryPolicy {
+            initial_delay: Duration::from_millis(100),
+            multiplier: 2.0,
+            jitter: false,
+            max_delay: Duration::from_secs(60),
+            ..Default::default()
+        };
+
+        let delay1 = policy.delay_for_attempt(1);
+        let delay2 = policy.delay_for_attempt(2);
+
+        // delay2 should be larger than delay1 (exponential backoff)
+        assert!(delay2 >= delay1);
+    }
+
+    #[test]
+    fn test_delay_capped_at_max() {
+        let policy = RetryPolicy {
+            initial_delay: Duration::from_millis(100),
+            multiplier: 1000.0,
+            jitter: false,
+            max_delay: Duration::from_millis(500),
+            ..Default::default()
+        };
+
+        let delay = policy.delay_for_attempt(10);
+        // Should be capped near max_delay (with possible small jitter)
+        assert!(delay.as_millis() <= 750); // Max + 50% jitter ceiling
+    }
+
+    #[test]
+    fn test_retry_policy_default() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.max_attempts, 3);
+        assert!(policy.jitter);
+        assert!(policy.multiplier > 1.0);
+    }
+
+    #[test]
+    fn test_retry_policy_with_max_attempts() {
+        let policy = RetryPolicy::with_max_attempts(5);
+        assert_eq!(policy.max_attempts, 5);
+    }
+
+    #[tokio::test]
+    async fn test_retry_single_attempt() {
+        let policy = RetryPolicy::with_max_attempts(1);
+        let result: Result<i32, &str> = policy.execute(|| async { Err("fail") }).await;
+        assert!(result.is_err());
+    }
 }

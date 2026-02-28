@@ -341,9 +341,33 @@ mod tests {
     }
 
     #[test]
+    fn test_error_status_codes_extended() {
+        assert_eq!(ArcanaError::InvalidToken("bad".to_string()).status_code(), 401);
+        assert_eq!(ArcanaError::TokenExpired.status_code(), 401);
+        assert_eq!(ArcanaError::InvalidCredentials.status_code(), 401);
+        assert_eq!(ArcanaError::Database("db error".to_string()).status_code(), 500);
+        assert_eq!(ArcanaError::Internal("oops".to_string()).status_code(), 500);
+        assert_eq!(ArcanaError::Timeout("timed out".to_string()).status_code(), 503);
+    }
+
+    #[test]
     fn test_error_codes() {
         assert_eq!(ArcanaError::not_found("User", 1).error_code(), "NOT_FOUND");
         assert_eq!(ArcanaError::TokenExpired.error_code(), "TOKEN_EXPIRED");
+    }
+
+    #[test]
+    fn test_error_codes_extended() {
+        assert_eq!(ArcanaError::validation("bad input").error_code(), "VALIDATION_ERROR");
+        assert_eq!(ArcanaError::conflict("duplicate").error_code(), "CONFLICT");
+        assert_eq!(ArcanaError::unauthorized("no auth").error_code(), "UNAUTHORIZED");
+        assert_eq!(ArcanaError::forbidden("no perm").error_code(), "FORBIDDEN");
+        assert_eq!(ArcanaError::InvalidToken("bad".to_string()).error_code(), "INVALID_TOKEN");
+        assert_eq!(ArcanaError::InvalidCredentials.error_code(), "INVALID_CREDENTIALS");
+        assert_eq!(ArcanaError::Database("db".to_string()).error_code(), "DATABASE_ERROR");
+        assert_eq!(ArcanaError::internal("err").error_code(), "INTERNAL_SERVER_ERROR");
+        assert_eq!(ArcanaError::Timeout("t".to_string()).error_code(), "TIMEOUT");
+        assert_eq!(ArcanaError::RateLimitExceeded.error_code(), "RATE_LIMIT_EXCEEDED");
     }
 
     #[test]
@@ -351,5 +375,88 @@ mod tests {
         assert!(ArcanaError::Database("connection lost".to_string()).is_retriable());
         assert!(ArcanaError::Timeout("request timed out".to_string()).is_retriable());
         assert!(!ArcanaError::not_found("User", 1).is_retriable());
+    }
+
+    #[test]
+    fn test_non_retriable_errors() {
+        assert!(!ArcanaError::validation("bad input").is_retriable());
+        assert!(!ArcanaError::forbidden("no perm").is_retriable());
+        assert!(!ArcanaError::unauthorized("no auth").is_retriable());
+        assert!(!ArcanaError::conflict("dup").is_retriable());
+        assert!(!ArcanaError::InvalidCredentials.is_retriable());
+        assert!(!ArcanaError::RateLimitExceeded.is_retriable());
+    }
+
+    #[test]
+    fn test_circuit_breaker_errors() {
+        assert!(ArcanaError::Database("db error".to_string()).should_trip_circuit_breaker());
+        assert!(ArcanaError::Timeout("timeout".to_string()).should_trip_circuit_breaker());
+        assert!(!ArcanaError::validation("bad input").should_trip_circuit_breaker());
+        assert!(!ArcanaError::not_found("User", 1).should_trip_circuit_breaker());
+    }
+
+    #[test]
+    fn test_error_constructors() {
+        let not_found = ArcanaError::not_found("User", "123");
+        assert!(not_found.to_string().contains("User"));
+
+        let validation = ArcanaError::validation("invalid field");
+        assert!(validation.to_string().contains("invalid field"));
+
+        let conflict = ArcanaError::conflict("duplicate entry");
+        assert!(conflict.to_string().contains("duplicate entry"));
+
+        let unauthorized = ArcanaError::unauthorized("no token");
+        assert!(unauthorized.to_string().contains("no token"));
+
+        let forbidden = ArcanaError::forbidden("no perms");
+        assert!(forbidden.to_string().contains("no perms"));
+
+        let internal = ArcanaError::internal("panic");
+        assert!(internal.to_string().contains("panic"));
+    }
+
+    #[test]
+    fn test_error_display() {
+        let err = ArcanaError::TokenExpired;
+        assert!(err.to_string().contains("Token expired") || !err.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_error_response_from_error() {
+        let err = ArcanaError::not_found("User", 1);
+        let response = ErrorResponse::from_error(&err);
+        assert_eq!(response.code, "NOT_FOUND");
+        assert!(!response.message.is_empty());
+        assert!(response.details.is_none());
+        assert!(response.trace_id.is_none());
+    }
+
+    #[test]
+    fn test_error_response_with_trace_id() {
+        let err = ArcanaError::not_found("User", 1);
+        let response = ErrorResponse::from_error(&err)
+            .with_trace_id("trace-123");
+        assert_eq!(response.trace_id, Some("trace-123".to_string()));
+    }
+
+    #[test]
+    fn test_error_response_with_details() {
+        let err = ArcanaError::validation("bad input");
+        let details = vec![FieldError {
+            field: "email".to_string(),
+            message: "Invalid email".to_string(),
+            code: "INVALID_EMAIL".to_string(),
+        }];
+        let response = ErrorResponse::from_error(&err).with_details(details);
+        assert!(response.details.is_some());
+        assert_eq!(response.details.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_error_response_from_ref() {
+        let err = ArcanaError::not_found("User", 42);
+        let response: ErrorResponse = ErrorResponse::from(&err);
+        assert_eq!(response.code, "NOT_FOUND");
     }
 }

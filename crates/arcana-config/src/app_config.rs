@@ -485,3 +485,318 @@ impl ObservabilityConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // AppConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_app_config_default() {
+        let config = AppConfig::default();
+        assert_eq!(config.app.name, "arcana-cloud");
+        assert_eq!(config.app.environment, "development");
+        assert_eq!(config.server.rest_port, 8080);
+        assert_eq!(config.server.grpc_port, 9090);
+        assert!(config.security.jwt_secret.len() > 0);
+    }
+
+    #[test]
+    fn test_app_config_serialization_roundtrip() {
+        let config = AppConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        let parsed: AppConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(config.app.name, parsed.app.name);
+        assert_eq!(config.server.rest_port, parsed.server.rest_port);
+        assert_eq!(config.database.url, parsed.database.url);
+    }
+
+    // =========================================================================
+    // AppMetadata tests
+    // =========================================================================
+
+    #[test]
+    fn test_app_metadata_default() {
+        let meta = AppMetadata::default();
+        assert_eq!(meta.name, "arcana-cloud");
+        assert_eq!(meta.environment, "development");
+        assert!(!meta.version.is_empty());
+    }
+
+    // =========================================================================
+    // ServerConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_server_config_rest_addr() {
+        let config = ServerConfig::default();
+        assert_eq!(config.rest_addr(), "0.0.0.0:8080");
+    }
+
+    #[test]
+    fn test_server_config_grpc_addr() {
+        let config = ServerConfig::default();
+        assert_eq!(config.grpc_addr(), "0.0.0.0:9090");
+    }
+
+    #[test]
+    fn test_server_config_custom_addr() {
+        let config = ServerConfig {
+            rest_host: "127.0.0.1".to_string(),
+            rest_port: 3000,
+            grpc_host: "127.0.0.1".to_string(),
+            grpc_port: 50051,
+            ..ServerConfig::default()
+        };
+        assert_eq!(config.rest_addr(), "127.0.0.1:3000");
+        assert_eq!(config.grpc_addr(), "127.0.0.1:50051");
+    }
+
+    #[test]
+    fn test_server_config_request_timeout() {
+        let config = ServerConfig {
+            request_timeout_secs: 60,
+            ..ServerConfig::default()
+        };
+        assert_eq!(config.request_timeout().as_secs(), 60);
+    }
+
+    #[test]
+    fn test_server_config_default_timeout() {
+        let config = ServerConfig::default();
+        assert_eq!(config.request_timeout().as_secs(), 30);
+    }
+
+    #[test]
+    fn test_server_config_default_max_body_size() {
+        let config = ServerConfig::default();
+        assert_eq!(config.max_body_size, 10 * 1024 * 1024);
+    }
+
+    // =========================================================================
+    // DatabaseConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_database_config_default() {
+        let config = DatabaseConfig::default();
+        assert!(config.url.contains("mysql://"));
+        assert_eq!(config.min_connections, 5);
+        assert_eq!(config.max_connections, 20);
+    }
+
+    #[test]
+    fn test_database_config_connect_timeout() {
+        let config = DatabaseConfig {
+            connect_timeout_secs: 45,
+            ..DatabaseConfig::default()
+        };
+        assert_eq!(config.connect_timeout().as_secs(), 45);
+    }
+
+    #[test]
+    fn test_database_config_idle_timeout() {
+        let config = DatabaseConfig {
+            idle_timeout_secs: 300,
+            ..DatabaseConfig::default()
+        };
+        assert_eq!(config.idle_timeout().as_secs(), 300);
+    }
+
+    #[test]
+    fn test_database_config_default_timeouts() {
+        let config = DatabaseConfig::default();
+        assert_eq!(config.connect_timeout().as_secs(), 30);
+        assert_eq!(config.idle_timeout().as_secs(), 600);
+    }
+
+    // =========================================================================
+    // SecurityConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_security_config_default() {
+        let config = SecurityConfig::default();
+        assert_eq!(config.jwt_access_expiration_secs, 3600);
+        assert_eq!(config.jwt_refresh_expiration_secs, 604800);
+        assert_eq!(config.jwt_issuer, "arcana-cloud");
+        assert_eq!(config.jwt_audience, "arcana-api");
+        assert!(!config.grpc_tls_enabled);
+    }
+
+    #[test]
+    fn test_security_config_access_token_expiration() {
+        let config = SecurityConfig::default();
+        assert_eq!(config.access_token_expiration().as_secs(), 3600);
+    }
+
+    #[test]
+    fn test_security_config_refresh_token_expiration() {
+        let config = SecurityConfig::default();
+        assert_eq!(config.refresh_token_expiration().as_secs(), 604800);
+    }
+
+    #[test]
+    fn test_security_config_interface_methods() {
+        let config = SecurityConfig::default();
+        assert_eq!(config.jwt_secret(), "change-me-in-production");
+        assert_eq!(config.jwt_access_expiration_secs(), 3600);
+        assert_eq!(config.jwt_refresh_expiration_secs(), 604800);
+        assert_eq!(config.jwt_issuer(), "arcana-cloud");
+        assert_eq!(config.jwt_audience(), "arcana-api");
+        assert!(!config.grpc_tls_enabled());
+        assert!(config.tls_cert_path().is_none());
+        assert!(config.tls_key_path().is_none());
+        assert_eq!(config.password_hash_cost(), 12);
+    }
+
+    #[test]
+    fn test_security_config_with_tls() {
+        let config = SecurityConfig {
+            grpc_tls_enabled: true,
+            tls_cert_path: Some("/etc/certs/server.crt".to_string()),
+            tls_key_path: Some("/etc/certs/server.key".to_string()),
+            ..SecurityConfig::default()
+        };
+        assert!(config.grpc_tls_enabled());
+        assert_eq!(config.tls_cert_path(), Some("/etc/certs/server.crt"));
+        assert_eq!(config.tls_key_path(), Some("/etc/certs/server.key"));
+    }
+
+    // =========================================================================
+    // PluginConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_plugin_config_default() {
+        let config = PluginConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.directory, "./plugins");
+        assert!(config.hot_reload);
+        assert_eq!(config.max_memory_bytes, 64 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_plugin_config_execution_timeout() {
+        let config = PluginConfig {
+            execution_timeout_secs: 60,
+            ..PluginConfig::default()
+        };
+        assert_eq!(config.execution_timeout().as_secs(), 60);
+    }
+
+    // =========================================================================
+    // SsrConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_ssr_config_default() {
+        let config = SsrConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.runtime_pool_size, 4);
+        assert!(config.cache_enabled);
+        assert_eq!(config.cache_ttl_secs, 300);
+    }
+
+    #[test]
+    fn test_ssr_config_cache_ttl() {
+        let config = SsrConfig::default();
+        assert_eq!(config.cache_ttl().as_secs(), 300);
+    }
+
+    #[test]
+    fn test_ssr_config_render_timeout() {
+        let config = SsrConfig {
+            render_timeout_ms: 3000,
+            ..SsrConfig::default()
+        };
+        assert_eq!(config.render_timeout().as_millis(), 3000);
+    }
+
+    // =========================================================================
+    // ObservabilityConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_observability_config_default() {
+        let config = ObservabilityConfig::default();
+        assert_eq!(config.log_level, "info");
+        assert_eq!(config.log_format, "pretty");
+        assert!(config.metrics_enabled);
+        assert_eq!(config.metrics_path, "/metrics");
+        assert!(config.tracing_enabled);
+        assert_eq!(config.service_name, "arcana-cloud-rust");
+        assert!(config.otlp_endpoint.is_none());
+        assert!((config.sampling_ratio - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_observability_config_to_telemetry_config_no_endpoint() {
+        let config = ObservabilityConfig::default();
+        let telemetry = config.to_telemetry_config();
+        // Without otlp_endpoint, should be disabled
+        assert!(!telemetry.enabled);
+        assert_eq!(telemetry.service_name, "arcana-cloud-rust");
+    }
+
+    #[test]
+    fn test_observability_config_to_telemetry_config_with_endpoint() {
+        let config = ObservabilityConfig {
+            otlp_endpoint: Some("http://localhost:4317".to_string()),
+            ..ObservabilityConfig::default()
+        };
+        let telemetry = config.to_telemetry_config();
+        assert!(telemetry.enabled);
+        assert_eq!(telemetry.otlp_endpoint, Some("http://localhost:4317".to_string()));
+    }
+
+    #[test]
+    fn test_observability_config_json_log_format() {
+        let config = ObservabilityConfig {
+            log_format: "json".to_string(),
+            otlp_endpoint: Some("http://localhost:4317".to_string()),
+            ..ObservabilityConfig::default()
+        };
+        let telemetry = config.to_telemetry_config();
+        assert!(!telemetry.console_output);
+    }
+
+    #[test]
+    fn test_observability_config_pretty_log_format() {
+        let config = ObservabilityConfig {
+            otlp_endpoint: Some("http://localhost:4317".to_string()),
+            ..ObservabilityConfig::default()
+        };
+        let telemetry = config.to_telemetry_config();
+        assert!(telemetry.console_output);
+    }
+
+    // =========================================================================
+    // RedisConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_redis_config_default() {
+        let config = RedisConfig::default();
+        assert_eq!(config.url, "redis://localhost:6379");
+        assert_eq!(config.pool_size, 10);
+        assert!(config.enabled);
+    }
+
+    // =========================================================================
+    // DeploymentConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_deployment_config_default() {
+        let config = DeploymentConfig::default();
+        assert_eq!(config.mode, DeploymentMode::Monolithic);
+        assert_eq!(config.layer, DeploymentLayer::All);
+        assert_eq!(config.protocol, CommunicationProtocol::Http);
+        assert!(config.service_url.is_none());
+        assert!(config.repository_url.is_none());
+    }
+}

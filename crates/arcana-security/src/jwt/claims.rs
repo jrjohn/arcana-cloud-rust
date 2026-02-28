@@ -173,6 +173,36 @@ mod tests {
     use super::*;
     use chrono::Duration;
 
+    fn make_access_claims(role: UserRole) -> Claims {
+        let user_id = UserId::new();
+        let expires = Utc::now() + Duration::hours(1);
+        Claims::new_access(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            role,
+            "issuer".to_string(),
+            "audience".to_string(),
+            expires,
+        )
+    }
+
+    fn make_refresh_claims() -> (UserId, Claims) {
+        let user_id = UserId::new();
+        let expires = Utc::now() + Duration::days(7);
+        let claims = Claims::new_refresh(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            UserRole::User,
+            "issuer".to_string(),
+            "audience".to_string(),
+            expires,
+            "session-id-123".to_string(),
+        );
+        (user_id, claims)
+    }
+
     #[test]
     fn test_access_token_claims() {
         let user_id = UserId::new();
@@ -193,6 +223,15 @@ mod tests {
     }
 
     #[test]
+    fn test_refresh_token_claims() {
+        let (_, claims) = make_refresh_claims();
+        assert!(claims.is_refresh_token());
+        assert!(!claims.is_access_token());
+        assert!(!claims.is_expired());
+        assert_eq!(claims.session_id, Some("session-id-123".to_string()));
+    }
+
+    #[test]
     fn test_role_check() {
         let user_id = UserId::new();
         let expires = Utc::now() + Duration::hours(1);
@@ -208,6 +247,130 @@ mod tests {
 
         assert!(claims.has_role(UserRole::User));
         assert!(claims.has_role(UserRole::Admin));
+        assert!(!claims.has_role(UserRole::SuperAdmin));
+    }
+
+    #[test]
+    fn test_user_id_extraction() {
+        let user_id = UserId::new();
+        let expires = Utc::now() + Duration::hours(1);
+        let claims = Claims::new_access(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            UserRole::User,
+            "issuer".to_string(),
+            "audience".to_string(),
+            expires,
+        );
+
+        let extracted = claims.user_id().unwrap();
+        assert_eq!(extracted, user_id);
+    }
+
+    #[test]
+    fn test_expires_at() {
+        let user_id = UserId::new();
+        let expires = Utc::now() + Duration::hours(1);
+        let claims = Claims::new_access(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            UserRole::User,
+            "issuer".to_string(),
+            "audience".to_string(),
+            expires,
+        );
+
+        let expires_at = claims.expires_at();
+        assert!(expires_at > Utc::now());
+    }
+
+    #[test]
+    fn test_expired_token() {
+        let user_id = UserId::new();
+        let expires = Utc::now() - Duration::hours(1); // Already expired
+        let claims = Claims::new_access(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            UserRole::User,
+            "issuer".to_string(),
+            "audience".to_string(),
+            expires,
+        );
+
+        assert!(claims.is_expired());
+    }
+
+    #[test]
+    fn test_claims_sub_matches_user_id() {
+        let user_id = UserId::new();
+        let expires = Utc::now() + Duration::hours(1);
+        let claims = Claims::new_access(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            UserRole::User,
+            "issuer".to_string(),
+            "audience".to_string(),
+            expires,
+        );
+
+        assert_eq!(claims.sub, user_id.to_string());
+    }
+
+    #[test]
+    fn test_claims_jti_is_unique() {
+        let claims1 = make_access_claims(UserRole::User);
+        let claims2 = make_access_claims(UserRole::User);
+        assert_ne!(claims1.jti, claims2.jti);
+    }
+
+    #[test]
+    fn test_claims_nbf_is_set() {
+        let claims = make_access_claims(UserRole::User);
+        assert!(claims.nbf.is_some());
+    }
+
+    #[test]
+    fn test_token_type_display() {
+        assert_eq!(TokenType::Access.to_string(), "access");
+        assert_eq!(TokenType::Refresh.to_string(), "refresh");
+    }
+
+    #[test]
+    fn test_claims_issuer_and_audience() {
+        let user_id = UserId::new();
+        let expires = Utc::now() + Duration::hours(1);
+        let claims = Claims::new_access(
+            user_id,
+            "testuser".to_string(),
+            "test@example.com".to_string(),
+            UserRole::User,
+            "my-issuer".to_string(),
+            "my-audience".to_string(),
+            expires,
+        );
+        assert_eq!(claims.iss, "my-issuer");
+        assert_eq!(claims.aud, "my-audience");
+    }
+
+    #[test]
+    fn test_superadmin_has_all_roles() {
+        let claims = make_access_claims(UserRole::SuperAdmin);
+        assert!(claims.has_role(UserRole::User));
+        assert!(claims.has_role(UserRole::Moderator));
+        assert!(claims.has_role(UserRole::Admin));
+        assert!(claims.has_role(UserRole::SuperAdmin));
+    }
+
+    #[test]
+    fn test_user_claims_only_user_role() {
+        let claims = make_access_claims(UserRole::User);
+        assert!(claims.has_role(UserRole::User));
+        assert!(!claims.has_role(UserRole::Moderator));
+        assert!(!claims.has_role(UserRole::Admin));
         assert!(!claims.has_role(UserRole::SuperAdmin));
     }
 }

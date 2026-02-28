@@ -201,6 +201,7 @@ pub mod guards {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arcana_core::Permission;
     use chrono::{Duration, Utc};
 
     fn create_claims(role: UserRole) -> Claims {
@@ -229,6 +230,36 @@ mod tests {
     }
 
     #[test]
+    fn test_require_permission() {
+        let user_claims = create_claims(UserRole::User);
+        let admin_claims = create_claims(UserRole::Admin);
+
+        assert!(user_claims.require_permission(Permission::UserRead).is_ok());
+        assert!(user_claims.require_permission(Permission::UserDelete).is_err());
+        assert!(admin_claims.require_permission(Permission::UserDelete).is_ok());
+    }
+
+    #[test]
+    fn test_require_admin() {
+        let user_claims = create_claims(UserRole::User);
+        let admin_claims = create_claims(UserRole::Admin);
+        let superadmin_claims = create_claims(UserRole::SuperAdmin);
+
+        assert!(user_claims.require_admin().is_err());
+        assert!(admin_claims.require_admin().is_ok());
+        assert!(superadmin_claims.require_admin().is_ok()); // SuperAdmin has admin perms
+    }
+
+    #[test]
+    fn test_require_super_admin() {
+        let admin_claims = create_claims(UserRole::Admin);
+        let superadmin_claims = create_claims(UserRole::SuperAdmin);
+
+        assert!(admin_claims.require_super_admin().is_err());
+        assert!(superadmin_claims.require_super_admin().is_ok());
+    }
+
+    #[test]
     fn test_owner_access() {
         let claims = create_claims(UserRole::User);
         let owner_id = claims.user_id().unwrap();
@@ -239,6 +270,24 @@ mod tests {
 
         assert!(claims.require_role_or_owner(UserRole::Admin, owner_id).is_ok());
         assert!(claims.require_role_or_owner(UserRole::Admin, other_id).is_err());
+    }
+
+    #[test]
+    fn test_admin_can_access_any_resource() {
+        let admin_claims = create_claims(UserRole::Admin);
+        let random_owner = UserId::new();
+
+        // Admin can access other users' resources
+        assert!(admin_claims.require_role_or_owner(UserRole::Admin, random_owner).is_ok());
+    }
+
+    #[test]
+    fn test_require_permission_system_config_super_admin_only() {
+        let admin_claims = create_claims(UserRole::Admin);
+        let superadmin_claims = create_claims(UserRole::SuperAdmin);
+
+        assert!(admin_claims.require_permission(Permission::SystemConfig).is_err());
+        assert!(superadmin_claims.require_permission(Permission::SystemConfig).is_ok());
     }
 
     #[test]
@@ -264,5 +313,30 @@ mod tests {
         assert!(guard.check(&user_claims, Some(owner_id)).is_ok());
         // User cannot access others' resources
         assert!(guard.check(&user_claims, Some(other_id)).is_err());
+    }
+
+    #[test]
+    fn test_moderator_guard() {
+        let user_claims = create_claims(UserRole::User);
+        let moderator_claims = create_claims(UserRole::Moderator);
+        let admin_claims = create_claims(UserRole::Admin);
+
+        let guard = guards::moderator();
+
+        assert!(user_claims.require_role(UserRole::Moderator).is_err());
+        assert!(guard.check(&user_claims, None).is_err());
+        assert!(guard.check(&moderator_claims, None).is_ok());
+        assert!(guard.check(&admin_claims, None).is_ok());
+    }
+
+    #[test]
+    fn test_permission_guard_with_specific_permission() {
+        let user_claims = create_claims(UserRole::User);
+        let admin_claims = create_claims(UserRole::Admin);
+
+        let guard = PermissionGuard::new().permission(Permission::UserDelete);
+
+        assert!(guard.check(&admin_claims, None).is_ok());
+        assert!(guard.check(&user_claims, None).is_err());
     }
 }

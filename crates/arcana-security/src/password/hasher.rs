@@ -247,4 +247,108 @@ mod tests {
         assert!(validate_password_strength("NoDigits!").is_err());
         assert!(validate_password_strength("nospecial123").is_err());
     }
+
+    #[test]
+    fn test_invalid_hash_format_returns_error() {
+        let hasher = PasswordHasher::new();
+        let result = hasher.verify("password", "not-a-valid-hash");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_needs_rehash_valid_argon2id_hash() {
+        let hasher = PasswordHasher::new();
+        let hash = hasher.hash("password").unwrap();
+        assert!(!hasher.needs_rehash(&hash));
+    }
+
+    #[test]
+    fn test_needs_rehash_invalid_hash() {
+        let hasher = PasswordHasher::new();
+        assert!(hasher.needs_rehash("invalid-hash"));
+    }
+
+    #[test]
+    fn test_hasher_default() {
+        let hasher = PasswordHasher::default();
+        let hash = hasher.hash("test_password").unwrap();
+        assert!(hasher.verify("test_password", &hash).unwrap());
+    }
+
+    #[test]
+    fn test_hasher_with_cost() {
+        let hasher = PasswordHasher::with_cost(1); // Minimal cost for testing speed
+        let hash = hasher.hash("test_password").unwrap();
+        assert!(hasher.verify("test_password", &hash).unwrap());
+    }
+
+    #[test]
+    fn test_password_strength_no_uppercase() {
+        let result = validate_password_strength("nouppercaseletter1!");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("uppercase")));
+    }
+
+    #[test]
+    fn test_password_strength_no_lowercase() {
+        let result = validate_password_strength("NOLOWERCASE1!");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("lowercase")));
+    }
+
+    #[test]
+    fn test_password_strength_no_digit() {
+        let result = validate_password_strength("NoDigitsHere!");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("digit")));
+    }
+
+    #[test]
+    fn test_password_strength_no_special() {
+        let result = validate_password_strength("NoSpecial1234");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("special")));
+    }
+
+    #[test]
+    fn test_password_strength_too_short() {
+        let result = validate_password_strength("Ab1!");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("8 characters")));
+    }
+
+    #[test]
+    fn test_password_strength_strong() {
+        assert!(validate_password_strength("Strong@Pass1").is_ok());
+        assert!(validate_password_strength("ValidP@55word").is_ok());
+        assert!(validate_password_strength("Sup3r$ecure!").is_ok());
+    }
+
+    #[test]
+    fn test_interface_hash_and_verify() {
+        let hasher = PasswordHasher::new();
+        let hash = PasswordHasherInterface::hash(&hasher, "TestPass!1").unwrap();
+        assert!(PasswordHasherInterface::verify(&hasher, "TestPass!1", &hash).unwrap());
+        assert!(!PasswordHasherInterface::verify(&hasher, "WrongPass!1", &hash).unwrap());
+    }
+
+    #[test]
+    fn test_interface_needs_rehash() {
+        let hasher = PasswordHasher::new();
+        let hash = hasher.hash("TestPass!1").unwrap();
+        assert!(!PasswordHasherInterface::needs_rehash(&hasher, &hash));
+        assert!(PasswordHasherInterface::needs_rehash(&hasher, "garbage-hash"));
+    }
+
+    #[test]
+    fn test_hasher_debug_does_not_leak_secrets() {
+        let hasher = PasswordHasher::new();
+        let debug_str = format!("{:?}", hasher);
+        assert!(debug_str.contains("PasswordHasher"));
+    }
 }

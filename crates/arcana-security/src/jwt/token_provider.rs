@@ -397,6 +397,27 @@ mod tests {
     }
 
     #[test]
+    fn test_token_pair_has_bearer_type() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider
+            .generate_tokens(user_id, "testuser", "test@example.com", UserRole::User)
+            .unwrap();
+        assert_eq!(tokens.token_type, "Bearer");
+    }
+
+    #[test]
+    fn test_token_expiry_timestamps() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider
+            .generate_tokens(user_id, "testuser", "test@example.com", UserRole::User)
+            .unwrap();
+        assert!(tokens.access_expires_at > 0);
+        assert!(tokens.refresh_expires_at > tokens.access_expires_at);
+    }
+
+    #[test]
     fn test_refresh_tokens() {
         let provider = create_test_provider();
         let user_id = UserId::new();
@@ -414,5 +435,130 @@ mod tests {
         let provider = create_test_provider();
         let result = provider.validate_token("invalid-token");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_access_token_with_refresh_token_fails() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider
+            .generate_tokens(user_id, "testuser", "test@example.com", UserRole::User)
+            .unwrap();
+
+        // Trying to validate a refresh token as access token should fail
+        let result = provider.validate_access_token(&tokens.refresh_token);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_refresh_token_with_access_token_fails() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider
+            .generate_tokens(user_id, "testuser", "test@example.com", UserRole::User)
+            .unwrap();
+
+        // Trying to validate an access token as refresh token should fail
+        let result = provider.validate_refresh_token(&tokens.access_token);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_without_validation() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider
+            .generate_tokens(user_id, "testuser", "test@example.com", UserRole::User)
+            .unwrap();
+
+        let claims = provider.decode_without_validation(&tokens.access_token).unwrap();
+        assert_eq!(claims.username, "testuser");
+    }
+
+    #[test]
+    fn test_generate_access_token() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let token = provider
+            .generate_access_token(user_id, "testuser", "test@example.com", UserRole::Admin)
+            .unwrap();
+
+        let claims = provider.validate_access_token(&token).unwrap();
+        assert_eq!(claims.username, "testuser");
+        assert_eq!(claims.role, UserRole::Admin);
+    }
+
+    #[test]
+    fn test_generate_refresh_token() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let token = provider
+            .generate_refresh_token(user_id, "testuser", "test@example.com", UserRole::User, "sess-1")
+            .unwrap();
+
+        let claims = provider.validate_refresh_token(&token).unwrap();
+        assert!(claims.is_refresh_token());
+        assert_eq!(claims.session_id, Some("sess-1".to_string()));
+    }
+
+    #[test]
+    fn test_wrong_signature_fails() {
+        let provider1 = create_test_provider();
+        let config2 = SecurityConfig {
+            jwt_secret: "different-secret-key-for-testing".to_string(),
+            jwt_access_expiration_secs: 3600,
+            jwt_refresh_expiration_secs: 86400,
+            jwt_issuer: "test-issuer".to_string(),
+            jwt_audience: "test-audience".to_string(),
+            ..Default::default()
+        };
+        let provider2 = TokenProvider::new(Arc::new(config2));
+
+        let user_id = UserId::new();
+        let tokens = provider1
+            .generate_tokens(user_id, "testuser", "test@example.com", UserRole::User)
+            .unwrap();
+
+        // Token signed by provider1 should not validate with provider2
+        let result = provider2.validate_access_token(&tokens.access_token);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_interface_generate_tokens() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+
+        let tokens = TokenProviderInterface::generate_tokens(
+            &provider, user_id, "testuser", "test@example.com", UserRole::User
+        ).unwrap();
+
+        assert!(!tokens.access_token.is_empty());
+        assert!(!tokens.refresh_token.is_empty());
+    }
+
+    #[test]
+    fn test_interface_validate_token() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider.generate_tokens(user_id, "u", "u@x.com", UserRole::User).unwrap();
+        let claims = TokenProviderInterface::validate_token(&provider, &tokens.access_token).unwrap();
+        assert!(claims.is_access_token());
+    }
+
+    #[test]
+    fn test_interface_decode_without_validation() {
+        let provider = create_test_provider();
+        let user_id = UserId::new();
+        let tokens = provider.generate_tokens(user_id, "u", "u@x.com", UserRole::User).unwrap();
+        let claims = TokenProviderInterface::decode_without_validation(&provider, &tokens.access_token).unwrap();
+        assert_eq!(claims.username, "u");
+    }
+
+    #[test]
+    fn test_provider_debug() {
+        let provider = create_test_provider();
+        let debug_str = format!("{:?}", provider);
+        assert!(debug_str.contains("TokenProvider"));
     }
 }

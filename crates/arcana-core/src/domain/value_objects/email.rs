@@ -112,4 +112,90 @@ mod tests {
         assert_eq!(email.local_part(), "user");
         assert_eq!(email.domain(), "example.com");
     }
+
+    #[test]
+    fn test_email_display() {
+        let email = Email::new("user@example.com").unwrap();
+        assert_eq!(format!("{}", email), "user@example.com");
+    }
+
+    #[test]
+    fn test_email_as_ref() {
+        let email = Email::new("user@example.com").unwrap();
+        let s: &str = email.as_ref();
+        assert_eq!(s, "user@example.com");
+    }
+
+    #[test]
+    fn test_email_into_string() {
+        let email = Email::new("user@example.com").unwrap();
+        let s: String = email.into();
+        assert_eq!(s, "user@example.com");
+    }
+
+    #[test]
+    fn test_email_try_from_string() {
+        let email = Email::try_from("user@example.com".to_string()).unwrap();
+        assert_eq!(email.as_str(), "user@example.com");
+    }
+
+    #[test]
+    fn test_email_try_from_invalid_string() {
+        assert!(Email::try_from("not-an-email".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_email_new_unchecked() {
+        let email = Email::new_unchecked("  UPPER@DOMAIN.COM  ");
+        assert_eq!(email.as_str(), "upper@domain.com");
+    }
+
+    #[test]
+    fn test_email_equality() {
+        let email1 = Email::new("user@example.com").unwrap();
+        let email2 = Email::new("USER@EXAMPLE.COM").unwrap();
+        assert_eq!(email1, email2);
+    }
+
+    #[test]
+    fn test_email_clone() {
+        let email = Email::new("user@example.com").unwrap();
+        let cloned = email.clone();
+        assert_eq!(email, cloned);
+    }
+
+    #[test]
+    fn test_email_serialization() {
+        let email = Email::new("user@example.com").unwrap();
+        let json = serde_json::to_string(&email).unwrap();
+        assert_eq!(json, "\"user@example.com\"");
+        let parsed: Email = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, email);
+    }
+
+    #[test]
+    fn test_email_deserialization_invalid() {
+        let json = "\"not-an-email\"";
+        assert!(serde_json::from_str::<Email>(json).is_err());
+    }
+
+    #[test]
+    fn test_email_with_subdomain() {
+        let email = Email::new("user@mail.example.com").unwrap();
+        assert_eq!(email.domain(), "mail.example.com");
+        assert_eq!(email.local_part(), "user");
+    }
+
+    #[test]
+    fn test_email_with_plus_sign() {
+        let email = Email::new("user+tag@example.com").unwrap();
+        assert_eq!(email.local_part(), "user+tag");
+    }
+
+    #[test]
+    fn test_email_error_display() {
+        let err = Email::new("bad").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("Invalid email address"));
+    }
 }
