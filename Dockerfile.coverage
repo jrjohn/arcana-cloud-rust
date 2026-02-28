@@ -1,5 +1,10 @@
+# ARM64-native Rust coverage using cargo-llvm-cov (tarpaulin is x86_64 only)
 FROM rust:latest
-# Install llvm-tools and cargo-llvm-cov (ARM64-native approach, tarpaulin is x86_64 only)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    protobuf-compiler \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 RUN rustup component add llvm-tools-preview && \
     cargo install cargo-llvm-cov --locked
 WORKDIR /app
