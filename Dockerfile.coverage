@@ -1,0 +1,6 @@
+FROM rust:latest
+# Install llvm-tools and cargo-llvm-cov (ARM64-native approach, tarpaulin is x86_64 only)
+RUN rustup component add llvm-tools-preview && \
+    cargo install cargo-llvm-cov --locked
+WORKDIR /app
+COPY . .

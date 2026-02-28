@@ -1,6 +1,5 @@
 services:
   test:
-    # Standard cargo test (existing)
     build:
       context: .
       dockerfile: Dockerfile.ci
@@ -9,16 +8,17 @@ services:
     command: sh -c "cargo test --workspace --no-fail-fast 2>&1 || true"
 
   coverage:
-    # Tarpaulin coverage - generates lcov.info for SonarQube
-    image: xd009642/tarpaulin:latest
+    # Uses cargo-llvm-cov (ARM64-native, tarpaulin is x86_64 only)
+    build:
+      context: .
+      dockerfile: Dockerfile.coverage
     working_dir: /app
     volumes:
-      - .:/app
       - ./coverage:/output
-    security_opt:
-      - seccomp:unconfined
     command: >
-      cargo tarpaulin --workspace --no-fail-fast
-        --out Lcov --output-dir /output
-        --timeout 120
-        2>&1 || true
+      sh -c "
+        cargo llvm-cov --workspace --no-fail-fast
+          --lcov --output-path /output/lcov.info
+          --ignore-filename-regex 'generated|proto|target'
+          2>&1 || true
+      "
