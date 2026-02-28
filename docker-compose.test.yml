@@ -5,20 +5,22 @@ services:
       dockerfile: Dockerfile.ci
       target: builder
     working_dir: /app
-    command: sh -c "cargo test --workspace --no-fail-fast 2>&1 || true"
+    command: ["sh", "-c", "cargo test --workspace --no-fail-fast 2>&1 || true"]
 
   coverage:
-    # Uses cargo-llvm-cov (ARM64-native, tarpaulin is x86_64 only)
+    # ARM64-native: cargo-llvm-cov (tarpaulin is x86_64 only)
     build:
       context: .
       dockerfile: Dockerfile.coverage
     working_dir: /app
     volumes:
       - ./coverage:/output
-    command: >
-      sh -c "
-        cargo llvm-cov --workspace --no-fail-fast
-          --lcov --output-path /output/lcov.info
-          --ignore-filename-regex 'generated|proto|target'
+    # Use --lib to skip database integration tests that require a live DB
+    command:
+      - sh
+      - -c
+      - |
+        cargo llvm-cov --lib --workspace --no-fail-fast \
+          --lcov --output-path /output/lcov.info \
+          --ignore-filename-regex 'generated|proto|target' \
           2>&1 || true
-      "

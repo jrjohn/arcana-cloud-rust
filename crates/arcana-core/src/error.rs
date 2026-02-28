@@ -365,7 +365,7 @@ mod tests {
         assert_eq!(ArcanaError::InvalidToken("bad".to_string()).error_code(), "INVALID_TOKEN");
         assert_eq!(ArcanaError::InvalidCredentials.error_code(), "INVALID_CREDENTIALS");
         assert_eq!(ArcanaError::Database("db".to_string()).error_code(), "DATABASE_ERROR");
-        assert_eq!(ArcanaError::internal("err").error_code(), "INTERNAL_SERVER_ERROR");
+        assert_eq!(ArcanaError::internal("err").error_code(), "INTERNAL_ERROR");
         assert_eq!(ArcanaError::Timeout("t".to_string()).error_code(), "TIMEOUT");
         assert_eq!(ArcanaError::RateLimitExceeded.error_code(), "RATE_LIMIT_EXCEEDED");
     }
