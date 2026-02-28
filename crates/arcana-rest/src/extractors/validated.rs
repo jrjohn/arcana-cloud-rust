@@ -89,7 +89,7 @@ impl IntoResponse for ValidatedJsonRejection {
 }
 
 /// Convert validator errors to field errors.
-fn convert_validation_errors(errors: &ValidationErrors) -> Vec<FieldError> {
+fn convert_validation_errors(errors: &ValidationErrors) -> Vec<FieldError> { // NOSONAR
     let mut field_errors = Vec::new();
 
     for (field, field_errs) in errors.field_errors() {

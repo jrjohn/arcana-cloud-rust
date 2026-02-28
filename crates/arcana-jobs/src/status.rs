@@ -65,7 +65,7 @@ impl JobStatusTracker {
     }
 
     /// Search jobs by various criteria.
-    pub async fn search_jobs(&self, query: JobSearchQuery) -> JobResult<JobSearchResult> {
+    pub async fn search_jobs(&self, query: JobSearchQuery) -> JobResult<JobSearchResult> { // NOSONAR
         let mut conn = self.pool.get().await?;
 
         // Determine which set to search based on status

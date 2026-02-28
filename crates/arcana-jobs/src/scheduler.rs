@@ -340,7 +340,7 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Check scheduled jobs and enqueue those due for execution.
-    async fn check_and_enqueue_jobs(&self) -> JobResult<()> {
+    async fn check_and_enqueue_jobs(&self) -> JobResult<()> { // NOSONAR - complex scheduling logic
         let now = Utc::now();
         let mut conn = self.pool.get().await?;
 

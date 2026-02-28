@@ -174,7 +174,7 @@ pub struct DatabaseConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            url: "mysql://arcana:arcana@localhost:3306/arcana".to_string(),
+            url: std::env::var("DATABASE_URL").unwrap_or_default(),
             min_connections: 5,
             max_connections: 20,
             connect_timeout_secs: 30,
@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn test_database_config_default() {
         let config = DatabaseConfig::default();
-        assert!(config.url.contains("mysql://"));
+        // URL comes from DATABASE_URL env var, no hardcoded value to assert
         assert_eq!(config.min_connections, 5);
         assert_eq!(config.max_connections, 20);
     }
