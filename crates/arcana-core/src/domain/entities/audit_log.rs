@@ -274,9 +274,10 @@ mod tests {
     #[test]
     fn test_audit_log_new_direct() {
         let user_id = UserId::new();
-        let log = AuditLog::new(Some(user_id), AuditAction::Logout, "session", None, true, None);
-        assert!(log.success);
+        let log = AuditLog::new(Some(user_id), AuditAction::Logout, "session", None);
         assert_eq!(log.action, AuditAction::Logout);
+        assert_eq!(log.user_id, Some(user_id));
+        assert!(log.resource_type == "session");
     }
 
     #[test]
