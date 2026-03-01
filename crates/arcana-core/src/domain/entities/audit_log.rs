@@ -247,4 +247,63 @@ mod tests {
         assert!(!log.success);
         assert_eq!(log.error_message, Some("Invalid credentials".to_string()));
     }
+
+    #[test]
+    fn test_audit_log_with_details() {
+        use serde_json::json;
+        let user_id = UserId::new();
+        let log = AuditLog::success(Some(user_id), AuditAction::UserCreate, "user", None)
+            .with_details(json!({"role": "admin"}));
+        assert!(log.details.is_some());
+    }
+
+    #[test]
+    fn test_audit_log_with_ip_address() {
+        let log = AuditLog::success(None, AuditAction::Login, "user", None)
+            .with_ip_address("192.168.1.1");
+        assert_eq!(log.ip_address, Some("192.168.1.1".to_string()));
+    }
+
+    #[test]
+    fn test_audit_log_with_user_agent() {
+        let log = AuditLog::success(None, AuditAction::Login, "user", None)
+            .with_user_agent("Mozilla/5.0");
+        assert_eq!(log.user_agent, Some("Mozilla/5.0".to_string()));
+    }
+
+    #[test]
+    fn test_audit_log_new_direct() {
+        let user_id = UserId::new();
+        let log = AuditLog::new(Some(user_id), AuditAction::Logout, "session", None, true, None);
+        assert!(log.success);
+        assert_eq!(log.action, AuditAction::Logout);
+    }
+
+    #[test]
+    fn test_audit_action_display() {
+        assert_eq!(AuditAction::Login.to_string(), "LOGIN");
+        assert_eq!(AuditAction::Logout.to_string(), "LOGOUT");
+        assert_eq!(AuditAction::TokenRefresh.to_string(), "TOKEN_REFRESH");
+        assert_eq!(AuditAction::PasswordChange.to_string(), "PASSWORD_CHANGE");
+        assert_eq!(AuditAction::UserCreate.to_string(), "USER_CREATE");
+        assert_eq!(AuditAction::UserUpdate.to_string(), "USER_UPDATE");
+        assert_eq!(AuditAction::UserDelete.to_string(), "USER_DELETE");
+        assert_eq!(AuditAction::PluginInstall.to_string(), "PLUGIN_INSTALL");
+        assert_eq!(AuditAction::PluginUninstall.to_string(), "PLUGIN_UNINSTALL");
+        assert_eq!(AuditAction::PluginEnable.to_string(), "PLUGIN_ENABLE");
+        assert_eq!(AuditAction::PluginDisable.to_string(), "PLUGIN_DISABLE");
+        assert_eq!(AuditAction::PluginConfigChange.to_string(), "PLUGIN_CONFIG_CHANGE");
+        assert_eq!(AuditAction::ConfigChange.to_string(), "CONFIG_CHANGE");
+        assert_eq!(AuditAction::SystemStart.to_string(), "SYSTEM_START");
+        assert_eq!(AuditAction::SystemShutdown.to_string(), "SYSTEM_SHUTDOWN");
+        assert_eq!(AuditAction::Create.to_string(), "CREATE");
+        assert_eq!(AuditAction::Read.to_string(), "READ");
+        assert_eq!(AuditAction::Update.to_string(), "UPDATE");
+        assert_eq!(AuditAction::Delete.to_string(), "DELETE");
+        assert_eq!(AuditAction::Custom.to_string(), "CUSTOM");
+        assert_eq!(AuditAction::UserRoleChange.to_string(), "USER_ROLE_CHANGE");
+        assert_eq!(AuditAction::UserStatusChange.to_string(), "USER_STATUS_CHANGE");
+        assert_eq!(AuditAction::PasswordResetRequest.to_string(), "PASSWORD_RESET_REQUEST");
+        assert_eq!(AuditAction::PasswordResetComplete.to_string(), "PASSWORD_RESET_COMPLETE");
+    }
 }
