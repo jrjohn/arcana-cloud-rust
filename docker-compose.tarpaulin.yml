@@ -1,0 +1,19 @@
+services:
+  tarpaulin:
+    image: xd009642/tarpaulin:develop-nightly
+    platform: linux/amd64
+    working_dir: /app
+    volumes:
+      - .:/app
+    security_opt:
+      - seccomp:unconfined
+    command: >
+      cargo tarpaulin
+        --workspace
+        --no-fail-fast
+        --exclude arcana-server
+        --out Lcov
+        --output-dir /app/coverage
+        --skip-clean
+        --
+        --test-threads 1
