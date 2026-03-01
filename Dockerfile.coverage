@@ -1,11 +1,14 @@
-# ARM64-native Rust coverage using cargo-llvm-cov (tarpaulin is x86_64 only)
+# ============================================
+# Rust Coverage Image
+# Uses cargo-llvm-cov for native ARM64 support
+# (avoids QEMU-based tarpaulin which SIGSEGV on aarch64 hosts)
+# ============================================
 FROM rust:latest
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    protobuf-compiler \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-RUN rustup component add llvm-tools-preview && \
-    cargo install cargo-llvm-cov --locked
-WORKDIR /app
-COPY . .
+    pkg-config libssl-dev protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install cargo-llvm-cov and llvm-tools-preview
+RUN cargo install cargo-llvm-cov --locked && \
+    rustup component add llvm-tools-preview

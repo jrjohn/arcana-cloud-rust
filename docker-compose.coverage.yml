@@ -1,0 +1,29 @@
+services:
+  coverage:
+    build:
+      context: .
+      dockerfile: Dockerfile.coverage
+    image: localhost:5000/arcana/rust-coverage:latest
+    working_dir: /app
+    volumes:
+      # Mount source code
+      - .:/app
+      # Persistent Cargo cache across builds (avoids full recompile each time)
+      - rust-coverage-cargo-cache:/usr/local/cargo/registry
+      - rust-coverage-target:/app/target
+    command: >
+      sh -c "mkdir -p coverage &&
+             cargo llvm-cov
+               --workspace
+               --exclude arcana-server
+               --no-fail-fast
+               --lcov
+               --output-path coverage/lcov.info &&
+             echo 'Coverage generated:' &&
+             wc -l coverage/lcov.info"
+
+volumes:
+  rust-coverage-cargo-cache:
+    external: false
+  rust-coverage-target:
+    external: false
