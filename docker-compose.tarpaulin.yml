@@ -1,6 +1,6 @@
 services:
   tarpaulin:
-    image: xd009642/tarpaulin:develop-nightly
+    image: xd009642/tarpaulin:0.31.2
     platform: linux/amd64
     working_dir: /app
     volumes:
