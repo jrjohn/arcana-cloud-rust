@@ -21,6 +21,7 @@ services:
                --exclude arcana-grpc
                --exclude arcana-plugin-runtime
                --exclude arcana-repository
+               --no-fail-fast
                --lcov
                --output-path coverage/lcov.info &&
              echo 'Coverage generated:' &&
