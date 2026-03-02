@@ -307,4 +307,90 @@ mod tests {
         assert_eq!(AuditAction::PasswordResetRequest.to_string(), "PASSWORD_RESET_REQUEST");
         assert_eq!(AuditAction::PasswordResetComplete.to_string(), "PASSWORD_RESET_COMPLETE");
     }
+
+    #[test]
+    fn test_entity_id() {
+        let log = AuditLog::success(None, AuditAction::Create, "resource", None);
+        let entity_id = Entity::id(&log);
+        assert_eq!(entity_id, &log.id);
+    }
+
+    #[test]
+    fn test_audit_log_serde_roundtrip() {
+        use serde_json::json;
+        let log = AuditLog::success(None, AuditAction::Update, "widget", Some("w-42".into()))
+            .with_details(json!({"field": "name", "old": "foo", "new": "bar"}))
+            .with_ip_address("10.0.0.1")
+            .with_user_agent("TestAgent/1.0");
+        let json_str = serde_json::to_string(&log).expect("serialize");
+        let restored: AuditLog = serde_json::from_str(&json_str).expect("deserialize");
+        assert_eq!(restored.id, log.id);
+        assert_eq!(restored.resource_type, "widget");
+        assert_eq!(restored.resource_id, Some("w-42".into()));
+        assert_eq!(restored.ip_address, Some("10.0.0.1".into()));
+        assert_eq!(restored.user_agent, Some("TestAgent/1.0".into()));
+        assert!(restored.success);
+    }
+
+    #[test]
+    fn test_audit_log_failure_serde() {
+        let log = AuditLog::failure(None, AuditAction::Delete, "item", Some("i-1".into()), "forbidden");
+        let json_str = serde_json::to_string(&log).expect("serialize");
+        let restored: AuditLog = serde_json::from_str(&json_str).expect("deserialize");
+        assert!(!restored.success);
+        assert_eq!(restored.error_message, Some("forbidden".into()));
+    }
+
+    #[test]
+    fn test_audit_log_clone() {
+        let log = AuditLog::success(None, AuditAction::Read, "doc", None);
+        let log2 = log.clone();
+        assert_eq!(log.id, log2.id);
+        assert_eq!(log.action, log2.action);
+    }
+
+    #[test]
+    fn test_audit_log_debug() {
+        let log = AuditLog::success(None, AuditAction::Custom, "thing", None);
+        let s = format!("{:?}", log);
+        assert!(s.contains("AuditLog"));
+    }
+
+    #[test]
+    fn test_audit_action_serde() {
+        let action = AuditAction::UserCreate;
+        let json = serde_json::to_string(&action).expect("serialize");
+        assert!(json.contains("USER_CREATE"));
+        let back: AuditAction = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, AuditAction::UserCreate);
+    }
+
+    #[test]
+    fn test_audit_action_copy_and_eq() {
+        let a = AuditAction::Login;
+        let b = a; // Copy
+        assert_eq!(a, b);
+        assert_ne!(a, AuditAction::Logout);
+    }
+
+    #[test]
+    fn test_audit_log_resource_id_none() {
+        let log = AuditLog::new(None, AuditAction::SystemStart, "system", None);
+        assert!(log.resource_id.is_none());
+    }
+
+    #[test]
+    fn test_audit_log_with_all_options() {
+        use serde_json::json;
+        let user_id = UserId::new();
+        let log = AuditLog::new(Some(user_id), AuditAction::ConfigChange, "settings", Some("s-1".into()))
+            .with_details(json!({"key": "timeout"}))
+            .with_ip_address("172.16.0.1")
+            .with_user_agent("curl/7.x");
+        assert_eq!(log.user_id, Some(user_id));
+        assert_eq!(log.resource_type, "settings");
+        assert!(log.details.is_some());
+        assert_eq!(log.ip_address, Some("172.16.0.1".into()));
+        assert_eq!(log.user_agent, Some("curl/7.x".into()));
+    }
 }

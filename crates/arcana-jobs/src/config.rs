@@ -343,3 +343,390 @@ impl WorkerConfig {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // JobsConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_jobs_config_default() {
+        let cfg = JobsConfig::default();
+        // Smoke check: subfields are constructed
+        assert!(!cfg.redis.url.is_empty());
+        assert!(cfg.worker.concurrency >= 4);
+        assert_eq!(cfg.queue.max_size, 0);
+        assert!(cfg.scheduler.enabled);
+    }
+
+    #[test]
+    fn test_jobs_config_clone() {
+        let cfg = JobsConfig::default();
+        let cloned = cfg.clone();
+        assert_eq!(cfg.redis.url, cloned.redis.url);
+        assert_eq!(cfg.worker.concurrency, cloned.worker.concurrency);
+    }
+
+    #[test]
+    fn test_jobs_config_debug() {
+        let cfg = JobsConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("JobsConfig"));
+    }
+
+    #[test]
+    fn test_jobs_config_serde_roundtrip() {
+        let cfg = JobsConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let restored: JobsConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.redis.url, restored.redis.url);
+        assert_eq!(cfg.worker.job_timeout_secs, restored.worker.job_timeout_secs);
+    }
+
+    #[test]
+    fn test_jobs_config_partial_deserialize() {
+        // Only override redis url; rest should use defaults
+        let json = r#"{"redis": {"url": "redis://myhost:6380"}}"#;
+        let cfg: JobsConfig = serde_json::from_str(json).expect("deserialize partial");
+        assert_eq!(cfg.redis.url, "redis://myhost:6380");
+        assert_eq!(cfg.worker.job_timeout_secs, 300);
+    }
+
+    // =========================================================================
+    // RedisConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_redis_config_default_values() {
+        let cfg = RedisConfig::default();
+        assert_eq!(cfg.url, "redis://localhost:6379");
+        assert_eq!(cfg.pool_size, 10);
+        assert_eq!(cfg.connect_timeout_secs, 5);
+        assert_eq!(cfg.key_prefix, "arcana:jobs");
+    }
+
+    #[test]
+    fn test_redis_config_clone() {
+        let cfg = RedisConfig::default();
+        let c2 = cfg.clone();
+        assert_eq!(cfg.url, c2.url);
+        assert_eq!(cfg.pool_size, c2.pool_size);
+    }
+
+    #[test]
+    fn test_redis_config_debug() {
+        let cfg = RedisConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("RedisConfig"));
+    }
+
+    #[test]
+    fn test_redis_config_serde_roundtrip() {
+        let cfg = RedisConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let r: RedisConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.url, r.url);
+        assert_eq!(cfg.key_prefix, r.key_prefix);
+    }
+
+    #[test]
+    fn test_redis_config_custom_values() {
+        let json = r#"{
+            "url": "redis://prod:6379",
+            "pool_size": 20,
+            "connect_timeout_secs": 10,
+            "key_prefix": "myapp:jobs"
+        }"#;
+        let cfg: RedisConfig = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(cfg.url, "redis://prod:6379");
+        assert_eq!(cfg.pool_size, 20);
+        assert_eq!(cfg.connect_timeout_secs, 10);
+        assert_eq!(cfg.key_prefix, "myapp:jobs");
+    }
+
+    // =========================================================================
+    // WorkerConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_worker_config_default_values() {
+        let cfg = WorkerConfig::default();
+        assert!(cfg.concurrency >= 4);
+        assert_eq!(cfg.job_timeout_secs, 300);
+        assert_eq!(cfg.poll_interval_ms, 100);
+        assert_eq!(cfg.shutdown_timeout_secs, 30);
+        assert_eq!(cfg.heartbeat_interval_secs, 30);
+    }
+
+    #[test]
+    fn test_worker_config_job_timeout_duration() {
+        let cfg = WorkerConfig::default();
+        assert_eq!(cfg.job_timeout(), Duration::from_secs(300));
+    }
+
+    #[test]
+    fn test_worker_config_poll_interval_duration() {
+        let cfg = WorkerConfig::default();
+        assert_eq!(cfg.poll_interval(), Duration::from_millis(100));
+    }
+
+    #[test]
+    fn test_worker_config_shutdown_timeout_duration() {
+        let cfg = WorkerConfig::default();
+        assert_eq!(cfg.shutdown_timeout(), Duration::from_secs(30));
+    }
+
+    #[test]
+    fn test_worker_config_custom_durations() {
+        let cfg = WorkerConfig {
+            concurrency: 8,
+            job_timeout_secs: 600,
+            poll_interval_ms: 250,
+            shutdown_timeout_secs: 60,
+            heartbeat_interval_secs: 15,
+        };
+        assert_eq!(cfg.job_timeout(), Duration::from_secs(600));
+        assert_eq!(cfg.poll_interval(), Duration::from_millis(250));
+        assert_eq!(cfg.shutdown_timeout(), Duration::from_secs(60));
+    }
+
+    #[test]
+    fn test_worker_config_clone() {
+        let cfg = WorkerConfig::default();
+        let c2 = cfg.clone();
+        assert_eq!(cfg.concurrency, c2.concurrency);
+        assert_eq!(cfg.job_timeout_secs, c2.job_timeout_secs);
+    }
+
+    #[test]
+    fn test_worker_config_debug() {
+        let cfg = WorkerConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("WorkerConfig"));
+    }
+
+    #[test]
+    fn test_worker_config_serde_roundtrip() {
+        let cfg = WorkerConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let r: WorkerConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.job_timeout_secs, r.job_timeout_secs);
+        assert_eq!(cfg.poll_interval_ms, r.poll_interval_ms);
+    }
+
+    // =========================================================================
+    // QueueConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_queue_config_default_values() {
+        let cfg = QueueConfig::default();
+        assert_eq!(cfg.max_size, 0);
+        assert_eq!(cfg.retention_secs, 86400 * 7);
+    }
+
+    #[test]
+    fn test_queue_config_clone() {
+        let cfg = QueueConfig::default();
+        let c2 = cfg.clone();
+        assert_eq!(cfg.max_size, c2.max_size);
+        assert_eq!(cfg.retention_secs, c2.retention_secs);
+    }
+
+    #[test]
+    fn test_queue_config_debug() {
+        let cfg = QueueConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("QueueConfig"));
+    }
+
+    #[test]
+    fn test_queue_config_serde_roundtrip() {
+        let cfg = QueueConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let r: QueueConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.max_size, r.max_size);
+        assert_eq!(cfg.retention_secs, r.retention_secs);
+    }
+
+    // =========================================================================
+    // RetryConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_retry_config_default_values() {
+        let cfg = RetryConfig::default();
+        assert_eq!(cfg.max_retries, 3);
+        assert_eq!(cfg.initial_delay_ms, 1000);
+        assert_eq!(cfg.max_delay_ms, 3_600_000);
+        assert!((cfg.multiplier - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_retry_config_clone() {
+        let cfg = RetryConfig::default();
+        let c2 = cfg.clone();
+        assert_eq!(cfg.max_retries, c2.max_retries);
+        assert!((cfg.multiplier - c2.multiplier).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_retry_config_debug() {
+        let cfg = RetryConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("RetryConfig"));
+    }
+
+    #[test]
+    fn test_retry_config_serde_roundtrip() {
+        let cfg = RetryConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let r: RetryConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.max_retries, r.max_retries);
+        assert_eq!(cfg.initial_delay_ms, r.initial_delay_ms);
+    }
+
+    #[test]
+    fn test_retry_config_custom() {
+        let json = r#"{
+            "max_retries": 5,
+            "initial_delay_ms": 500,
+            "max_delay_ms": 60000,
+            "multiplier": 1.5
+        }"#;
+        let cfg: RetryConfig = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(cfg.max_retries, 5);
+        assert_eq!(cfg.initial_delay_ms, 500);
+        assert_eq!(cfg.max_delay_ms, 60_000);
+        assert!((cfg.multiplier - 1.5).abs() < f64::EPSILON);
+    }
+
+    // =========================================================================
+    // DlqConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_dlq_config_default_values() {
+        let cfg = DlqConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.max_size, 10_000);
+        assert_eq!(cfg.retention_secs, 86400 * 30);
+    }
+
+    #[test]
+    fn test_dlq_config_clone() {
+        let cfg = DlqConfig::default();
+        let c2 = cfg.clone();
+        assert_eq!(cfg.enabled, c2.enabled);
+        assert_eq!(cfg.max_size, c2.max_size);
+    }
+
+    #[test]
+    fn test_dlq_config_debug() {
+        let cfg = DlqConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("DlqConfig"));
+    }
+
+    #[test]
+    fn test_dlq_config_serde_roundtrip() {
+        let cfg = DlqConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let r: DlqConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.enabled, r.enabled);
+        assert_eq!(cfg.max_size, r.max_size);
+    }
+
+    #[test]
+    fn test_dlq_config_disabled() {
+        let json = r#"{"enabled": false, "max_size": 500, "retention_secs": 3600}"#;
+        let cfg: DlqConfig = serde_json::from_str(json).expect("deserialize");
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.max_size, 500);
+        assert_eq!(cfg.retention_secs, 3600);
+    }
+
+    // =========================================================================
+    // SchedulerConfig tests
+    // =========================================================================
+
+    #[test]
+    fn test_scheduler_config_default_values() {
+        let cfg = SchedulerConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.check_interval_secs, 60);
+        assert_eq!(cfg.poll_interval_secs, 10);
+        assert_eq!(cfg.leader_check_interval_secs, 15);
+        assert_eq!(cfg.leader_ttl_secs, 30);
+        assert_eq!(cfg.key_prefix, "arcana:jobs");
+    }
+
+    #[test]
+    fn test_scheduler_config_clone() {
+        let cfg = SchedulerConfig::default();
+        let c2 = cfg.clone();
+        assert_eq!(cfg.enabled, c2.enabled);
+        assert_eq!(cfg.check_interval_secs, c2.check_interval_secs);
+        assert_eq!(cfg.key_prefix, c2.key_prefix);
+    }
+
+    #[test]
+    fn test_scheduler_config_debug() {
+        let cfg = SchedulerConfig::default();
+        let s = format!("{:?}", cfg);
+        assert!(s.contains("SchedulerConfig"));
+    }
+
+    #[test]
+    fn test_scheduler_config_serde_roundtrip() {
+        let cfg = SchedulerConfig::default();
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let r: SchedulerConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg.enabled, r.enabled);
+        assert_eq!(cfg.poll_interval_secs, r.poll_interval_secs);
+        assert_eq!(cfg.leader_ttl_secs, r.leader_ttl_secs);
+    }
+
+    #[test]
+    fn test_scheduler_config_custom() {
+        let json = r#"{
+            "enabled": false,
+            "check_interval_secs": 30,
+            "poll_interval_secs": 5,
+            "leader_check_interval_secs": 10,
+            "leader_ttl_secs": 20,
+            "key_prefix": "custom:sched"
+        }"#;
+        let cfg: SchedulerConfig = serde_json::from_str(json).expect("deserialize");
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.check_interval_secs, 30);
+        assert_eq!(cfg.poll_interval_secs, 5);
+        assert_eq!(cfg.leader_check_interval_secs, 10);
+        assert_eq!(cfg.leader_ttl_secs, 20);
+        assert_eq!(cfg.key_prefix, "custom:sched");
+    }
+
+    // =========================================================================
+    // Full config override test
+    // =========================================================================
+
+    #[test]
+    fn test_full_config_override() {
+        let json = r#"{
+            "redis": {"url": "redis://redis:6379", "pool_size": 5},
+            "worker": {"concurrency": 2, "job_timeout_secs": 60},
+            "queue": {"max_size": 1000, "retention_secs": 3600},
+            "scheduler": {"enabled": false}
+        }"#;
+        let cfg: JobsConfig = serde_json::from_str(json).expect("deserialize full config");
+        assert_eq!(cfg.redis.url, "redis://redis:6379");
+        assert_eq!(cfg.redis.pool_size, 5);
+        assert_eq!(cfg.worker.concurrency, 2);
+        assert_eq!(cfg.worker.job_timeout_secs, 60);
+        assert_eq!(cfg.queue.max_size, 1000);
+        assert!(!cfg.scheduler.enabled);
+    }
+}
+

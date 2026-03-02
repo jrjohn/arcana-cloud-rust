@@ -423,12 +423,76 @@ mod tests {
         }
     }
 
+    // =========================================================================
+    // JobId tests
+    // =========================================================================
+
     #[test]
     fn test_job_id_generation() {
         let id1 = JobId::new();
         let id2 = JobId::new();
         assert_ne!(id1, id2);
     }
+
+    #[test]
+    fn test_job_id_from_string() {
+        let id = JobId::from_string("my-job-123");
+        assert_eq!(id.as_str(), "my-job-123");
+    }
+
+    #[test]
+    fn test_job_id_as_str() {
+        let id = JobId::from_string("abc");
+        assert_eq!(id.as_str(), "abc");
+    }
+
+    #[test]
+    fn test_job_id_display() {
+        let id = JobId::from_string("display-test");
+        assert_eq!(id.to_string(), "display-test");
+    }
+
+    #[test]
+    fn test_job_id_from_owned_string() {
+        let s = "owned-string".to_string();
+        let id: JobId = JobId::from(s);
+        assert_eq!(id.as_str(), "owned-string");
+    }
+
+    #[test]
+    fn test_job_id_from_str_ref() {
+        let id: JobId = JobId::from("str-ref");
+        assert_eq!(id.as_str(), "str-ref");
+    }
+
+    #[test]
+    fn test_job_id_default() {
+        let id1 = JobId::default();
+        let id2 = JobId::default();
+        // Both should be non-empty UUIDs
+        assert!(!id1.as_str().is_empty());
+        assert!(!id2.as_str().is_empty());
+        // And different
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_job_id_equality() {
+        let id1 = JobId::from_string("same");
+        let id2 = JobId::from_string("same");
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_job_id_clone() {
+        let id = JobId::from_string("clone-me");
+        let id2 = id.clone();
+        assert_eq!(id, id2);
+    }
+
+    // =========================================================================
+    // JobData tests
+    // =========================================================================
 
     #[test]
     fn test_job_data_serialization() {
@@ -446,6 +510,71 @@ mod tests {
     }
 
     #[test]
+    fn test_job_data_increment_attempt() {
+        let job = TestJob { message: "inc".to_string() };
+        let mut data = JobData::new(&job).unwrap();
+        assert_eq!(data.attempt, 0);
+        data.increment_attempt();
+        assert_eq!(data.attempt, 1);
+        data.increment_attempt();
+        assert_eq!(data.attempt, 2);
+    }
+
+    #[test]
+    fn test_job_data_is_exhausted_false() {
+        let job = TestJob { message: "not done".to_string() };
+        let data = JobData::new(&job).unwrap();
+        // attempt=0, max_attempts=4
+        assert!(!data.is_exhausted());
+    }
+
+    #[test]
+    fn test_job_data_is_exhausted_true() {
+        let job = TestJob { message: "done".to_string() };
+        let mut data = JobData::new(&job).unwrap();
+        // max_attempts = MAX_RETRIES + 1 = 4
+        data.attempt = data.max_attempts;
+        assert!(data.is_exhausted());
+    }
+
+    #[test]
+    fn test_job_data_set_error() {
+        let job = TestJob { message: "err".to_string() };
+        let mut data = JobData::new(&job).unwrap();
+        assert!(data.last_error.is_none());
+        let err = JobError::ExecutionFailed("something went wrong".to_string());
+        data.set_error(&err);
+        assert!(data.last_error.is_some());
+        assert!(data.last_error.unwrap().contains("something went wrong"));
+    }
+
+    #[test]
+    fn test_job_data_deserialize_payload() {
+        let job = TestJob { message: "deserialize me".to_string() };
+        let data = JobData::new(&job).unwrap();
+        let restored: TestJob = data.deserialize().unwrap();
+        assert_eq!(restored.message, "deserialize me");
+    }
+
+    #[test]
+    fn test_job_data_from_json_error() {
+        let result = JobData::from_json("not valid json at all!!!");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_job_data_clone() {
+        let job = TestJob { message: "clone".to_string() };
+        let data = JobData::new(&job).unwrap();
+        let c = data.clone();
+        assert_eq!(data.id, c.id);
+    }
+
+    // =========================================================================
+    // JobContext tests
+    // =========================================================================
+
+    #[test]
     fn test_job_context() {
         let job = TestJob {
             message: "Test".to_string(),
@@ -456,5 +585,114 @@ mod tests {
         assert_eq!(ctx.attempt, 0);
         assert_eq!(ctx.max_attempts, 4); // 3 retries + 1 initial
         assert!(!ctx.is_last_attempt());
+    }
+
+    #[test]
+    fn test_job_context_is_last_attempt_true() {
+        let job = TestJob { message: "last".to_string() };
+        let mut data = JobData::new(&job).unwrap();
+        data.attempt = data.max_attempts; // at/beyond max
+        let ctx = data.to_context("worker-1");
+        assert!(ctx.is_last_attempt());
+    }
+
+    #[test]
+    fn test_job_context_remaining_attempts() {
+        let job = TestJob { message: "remaining".to_string() };
+        let data = JobData::new(&job).unwrap();
+        let ctx = data.to_context("worker-1");
+        // attempt=0, max_attempts=4 → remaining=4
+        assert_eq!(ctx.remaining_attempts(), 4);
+    }
+
+    #[test]
+    fn test_job_context_remaining_attempts_partial() {
+        let job = TestJob { message: "partial".to_string() };
+        let mut data = JobData::new(&job).unwrap();
+        data.attempt = 2;
+        let ctx = data.to_context("worker-x");
+        assert_eq!(ctx.remaining_attempts(), 2);
+    }
+
+    #[test]
+    fn test_job_context_remaining_attempts_saturating() {
+        let job = TestJob { message: "over".to_string() };
+        let mut data = JobData::new(&job).unwrap();
+        data.attempt = data.max_attempts + 5; // over max
+        let ctx = data.to_context("worker-y");
+        // saturating_sub should return 0, not panic
+        assert_eq!(ctx.remaining_attempts(), 0);
+    }
+
+    #[test]
+    fn test_job_context_worker_id() {
+        let job = TestJob { message: "worker".to_string() };
+        let data = JobData::new(&job).unwrap();
+        let ctx = data.to_context("worker-42");
+        assert_eq!(ctx.worker_id, "worker-42");
+    }
+
+    // =========================================================================
+    // JobInfo / From<JobData> tests
+    // =========================================================================
+
+    #[test]
+    fn test_job_info_from_job_data() {
+        let job = TestJob { message: "info".to_string() };
+        let data = JobData::new(&job).unwrap();
+        let data_id = data.id.clone();
+        let info: JobInfo = JobInfo::from(data);
+        assert_eq!(info.id, data_id);
+        assert_eq!(info.name, "test_job");
+        assert_eq!(info.queue, "test");
+        assert_eq!(info.status, "pending");
+        assert!(info.started_at.is_none());
+        assert!(info.completed_at.is_none());
+        assert!(info.worker_id.is_none());
+    }
+
+    // =========================================================================
+    // JobStatus tests
+    // =========================================================================
+
+    #[test]
+    fn test_job_status_default() {
+        let s = JobStatus::default();
+        assert_eq!(s, JobStatus::Pending);
+    }
+
+    #[test]
+    fn test_job_status_display() {
+        assert_eq!(JobStatus::Pending.to_string(), "pending");
+        assert_eq!(JobStatus::Scheduled.to_string(), "scheduled");
+        assert_eq!(JobStatus::Running.to_string(), "running");
+        assert_eq!(JobStatus::Completed.to_string(), "completed");
+        assert_eq!(JobStatus::Failed.to_string(), "failed");
+        assert_eq!(JobStatus::DeadLetter.to_string(), "dead_letter");
+        assert_eq!(JobStatus::Cancelled.to_string(), "cancelled");
+    }
+
+    #[test]
+    fn test_job_status_equality() {
+        assert_eq!(JobStatus::Pending, JobStatus::Pending);
+        assert_ne!(JobStatus::Pending, JobStatus::Failed);
+    }
+
+    #[test]
+    fn test_job_status_clone_copy() {
+        let s = JobStatus::Running;
+        let s2 = s; // Copy
+        assert_eq!(s, s2);
+        let s3 = s.clone();
+        assert_eq!(s, s3);
+    }
+
+    #[test]
+    fn test_job_status_serde() {
+        let s = JobStatus::DeadLetter;
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains("dead_letter"));
+        let back: JobStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, JobStatus::DeadLetter);
     }
 }

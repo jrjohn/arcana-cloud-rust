@@ -208,4 +208,49 @@ mod tests {
         assert!(!err.is_retryable());
         assert!(!err.should_dlq());
     }
+
+    #[test]
+    fn test_from_serde_json_error() {
+        // Trigger a real serde_json::Error
+        let json_err = serde_json::from_str::<i64>("not-a-number").unwrap_err();
+        let job_err = JobError::from(json_err);
+        assert!(matches!(job_err, JobError::Serialization(_)));
+        // Serialization errors should NOT be retryable
+        assert!(!job_err.is_retryable());
+        // But they should go to DLQ
+        assert!(job_err.should_dlq());
+    }
+
+    #[test]
+    fn test_job_result_type_ok() {
+        let r: super::JobResult<i32> = Ok(42);
+        assert_eq!(r.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_job_result_type_err() {
+        let r: super::JobResult<i32> = Err(JobError::Cancelled);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_internal_error() {
+        let err = JobError::Internal("something unexpected".into());
+        assert!(!err.is_retryable());
+        assert!(!err.should_dlq());
+        assert!(err.to_string().contains("unexpected"));
+    }
+
+    #[test]
+    fn test_not_found_error_display() {
+        let err = JobError::NotFound("job-999".into());
+        assert!(err.to_string().contains("job-999"));
+    }
+
+    #[test]
+    fn test_worker_error_display() {
+        let err = JobError::Worker("panicked".into());
+        assert!(err.to_string().contains("panicked"));
+        assert!(err.is_retryable());
+    }
 }
