@@ -15,6 +15,7 @@ services:
       sh -c "mkdir -p coverage &&
              cargo llvm-cov
                --workspace
+               --lib
                --exclude arcana-server
                --exclude arcana-grpc
                --exclude arcana-plugin-runtime

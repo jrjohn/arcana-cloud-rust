@@ -454,6 +454,8 @@ mod tests {
     fn valid_config() -> AppConfig {
         let mut config = AppConfig::default();
         config.security.jwt_secret = "a".repeat(32); // Valid length
+        // DATABASE_URL env var may not be set in test env; provide a valid URL
+        config.database.url = "mysql://user:pass@localhost:3306/testdb".to_string();
         config
     }
 
