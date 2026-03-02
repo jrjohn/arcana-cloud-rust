@@ -16,6 +16,8 @@ services:
              cargo llvm-cov
                --workspace
                --exclude arcana-server
+               --exclude arcana-grpc
+               --exclude arcana-plugin-runtime
                --no-fail-fast
                --lcov
                --output-path coverage/lcov.info &&
