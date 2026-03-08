@@ -46,6 +46,8 @@ echo "╚═══════════════════════�
 cleanup() {
     local EXIT_CODE=$?
     echo ""
+    echo "▶ [cleanup] Disconnecting Jenkins from kind network ..."
+    docker network disconnect kind "$(hostname)" 2>/dev/null || true
     echo "▶ [cleanup] Deleting Kind cluster '${CLUSTER_NAME}' ..."
     kind delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
     if [ "${EXIT_CODE}" -ne 0 ]; then
@@ -89,13 +91,25 @@ nodes:
         protocol: TCP
 EOF
 
-# Export kubeconfig and fix server address for container-to-container access
+# Export kubeconfig
 kind export kubeconfig --name "${CLUSTER_NAME}"
+
+# Connect Jenkins container to the kind Docker network so kubectl can reach the API server
+echo "  Connecting Jenkins container $(hostname) to 'kind' Docker network ..."
+docker network connect kind "$(hostname)" 2>/dev/null || true
+
+# Get the kind control-plane IP on the kind network and patch kubeconfig
 KIND_CONTAINER="${CLUSTER_NAME}-control-plane"
-KIND_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${KIND_CONTAINER}" 2>/dev/null | tr ' ' '\n' | grep -v '^$' | head -1)
+KIND_IP=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{if eq $k "kind"}}{{$v.IPAddress}}{{end}}{{end}}' "${KIND_CONTAINER}" 2>/dev/null | tr -d '\n')
+if [ -z "${KIND_IP}" ]; then
+    # Fallback: use any IP
+    KIND_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${KIND_CONTAINER}" 2>/dev/null | tr ' ' '\n' | grep -v '^$' | head -1)
+fi
 if [ -n "${KIND_IP}" ]; then
-    echo "  Patching kubeconfig server to https://${KIND_IP}:6443 (kind node IP)"
-    kubectl config set-cluster "kind-${CLUSTER_NAME}" --server="https://${KIND_IP}:6443"
+    echo "  Patching kubeconfig server to https://${KIND_IP}:6443 (kind node IP on kind network)"
+    kubectl config set-cluster "kind-${CLUSTER_NAME}" \
+        --server="https://${KIND_IP}:6443" \
+        --insecure-skip-tls-verify=true
 else
     echo "  Warning: could not determine kind node IP, using default kubeconfig"
 fi
@@ -108,7 +122,8 @@ kind load docker-image "${CI_IMAGE}" --name "${CLUSTER_NAME}"
 # ── 5. Apply Kubernetes manifest ─────────────────────────────
 echo ""
 echo "▶ [5/7] Applying manifest '${MANIFEST}' ..."
-kubectl apply -f "${MANIFEST}"
+# --validate=false skips OpenAPI schema download (avoids network issues in DinD)
+kubectl apply -f "${MANIFEST}" --validate=false
 
 # ── 6. Wait for pods ─────────────────────────────────────────
 echo ""
@@ -165,8 +180,13 @@ done
 echo ""
 echo "▶ [7/7] Running integration smoke test ..."
 
-# Determine the Kind node IP for NodePort access
-NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)
+# Use the kind node IP we already determined (accessible via kind Docker network)
+# Fall back to kubectl node address if needed
+if [ -n "${KIND_IP}" ]; then
+    NODE_IP="${KIND_IP}"
+else
+    NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)
+fi
 if [ -z "${NODE_IP}" ]; then
     NODE_IP="localhost"
 fi
