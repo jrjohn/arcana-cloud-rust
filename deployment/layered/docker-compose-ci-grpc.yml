@@ -29,17 +29,19 @@ services:
         condition: service_healthy
     environment:
       RUST_LOG: info
-      ARCANA_APP__ENVIRONMENT: ci
-      ARCANA_DEPLOYMENT__MODE: layeredgrpc
-      ARCANA_DEPLOYMENT__LAYER: repository
-      ARCANA_SERVER__GRPC_HOST: 0.0.0.0
-      ARCANA_SERVER__GRPC_PORT: "9090"
-      ARCANA_DATABASE__URL: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
-      ARCANA_SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
-      ARCANA_SECURITY__JWT_ISSUER: arcana-cloud
-      ARCANA_SECURITY__JWT_AUDIENCE: arcana-api
+      ARCANA_ENVIRONMENT: ci
+      ARCANA_DEPLOYMENT_MODE: layeredgrpc
+      ARCANA__APP__ENVIRONMENT: ci
+      ARCANA__DEPLOYMENT__MODE: layeredgrpc
+      ARCANA__DEPLOYMENT__LAYER: repository
+      ARCANA__SERVER__GRPC_HOST: 0.0.0.0
+      ARCANA__SERVER__GRPC_PORT: "9090"
+      ARCANA__DATABASE__URL: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
+      ARCANA__SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
+      ARCANA__SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA__SECURITY__JWT_AUDIENCE: arcana-api
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --tries=1 --timeout=3 http://localhost:9090/ -O /dev/null 2>&1; code=$?; [ $code -eq 0 ] || [ $code -eq 8 ] && exit 0 || exit 1"]
+      test: ["CMD-SHELL", "wget -q --tries=1 --timeout=3 http://localhost:9090/ -O /dev/null 2>&1; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 8 ] && exit 0 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -55,17 +57,19 @@ services:
         condition: service_healthy
     environment:
       RUST_LOG: info
-      ARCANA_APP__ENVIRONMENT: ci
-      ARCANA_DEPLOYMENT__MODE: layeredgrpc
-      ARCANA_DEPLOYMENT__LAYER: service
-      ARCANA_SERVER__GRPC_HOST: 0.0.0.0
-      ARCANA_SERVER__GRPC_PORT: "9090"
-      ARCANA_DEPLOYMENT__REPOSITORY_URL: http://arcana-ci-rust-repository:9090
-      ARCANA_SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
-      ARCANA_SECURITY__JWT_ISSUER: arcana-cloud
-      ARCANA_SECURITY__JWT_AUDIENCE: arcana-api
+      ARCANA_ENVIRONMENT: ci
+      ARCANA_DEPLOYMENT_MODE: layeredgrpc
+      ARCANA__APP__ENVIRONMENT: ci
+      ARCANA__DEPLOYMENT__MODE: layeredgrpc
+      ARCANA__DEPLOYMENT__LAYER: service
+      ARCANA__SERVER__GRPC_HOST: 0.0.0.0
+      ARCANA__SERVER__GRPC_PORT: "9090"
+      ARCANA__DEPLOYMENT__REPOSITORY_URL: http://arcana-ci-rust-repository:9090
+      ARCANA__SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
+      ARCANA__SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA__SECURITY__JWT_AUDIENCE: arcana-api
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --tries=1 --timeout=3 http://localhost:9090/ -O /dev/null 2>&1; code=$?; [ $code -eq 0 ] || [ $code -eq 8 ] && exit 0 || exit 1"]
+      test: ["CMD-SHELL", "wget -q --tries=1 --timeout=3 http://localhost:9090/ -O /dev/null 2>&1; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 8 ] && exit 0 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -81,15 +85,17 @@ services:
         condition: service_healthy
     environment:
       RUST_LOG: info
-      ARCANA_APP__ENVIRONMENT: ci
-      ARCANA_DEPLOYMENT__MODE: layeredgrpc
-      ARCANA_DEPLOYMENT__LAYER: controller
-      ARCANA_SERVER__REST_HOST: 0.0.0.0
-      ARCANA_SERVER__REST_PORT: "8080"
-      ARCANA_DEPLOYMENT__SERVICE_URL: http://arcana-ci-rust-service:9090
-      ARCANA_SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
-      ARCANA_SECURITY__JWT_ISSUER: arcana-cloud
-      ARCANA_SECURITY__JWT_AUDIENCE: arcana-api
+      ARCANA_ENVIRONMENT: ci
+      ARCANA_DEPLOYMENT_MODE: layeredgrpc
+      ARCANA__APP__ENVIRONMENT: ci
+      ARCANA__DEPLOYMENT__MODE: layeredgrpc
+      ARCANA__DEPLOYMENT__LAYER: controller
+      ARCANA__SERVER__REST_HOST: 0.0.0.0
+      ARCANA__SERVER__REST_PORT: "8080"
+      ARCANA__DEPLOYMENT__SERVICE_URL: http://arcana-ci-rust-service:9090
+      ARCANA__SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
+      ARCANA__SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA__SECURITY__JWT_AUDIENCE: arcana-api
     ports:
       - "18094:8080"
     healthcheck:
