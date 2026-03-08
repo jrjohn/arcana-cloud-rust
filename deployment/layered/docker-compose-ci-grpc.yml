@@ -104,3 +104,4 @@ services:
 networks:
   arcana-ci-rust-net:
     driver: bridge
+    name: arcana-ci-rust-net
