@@ -89,10 +89,16 @@ nodes:
         protocol: TCP
 EOF
 
-# Point kubectl at new cluster
-export KUBECONFIG
-KUBECONFIG="$(kind get kubeconfig --name "${CLUSTER_NAME}" 2>/dev/null | head -1 || true)"
+# Export kubeconfig and fix server address for container-to-container access
 kind export kubeconfig --name "${CLUSTER_NAME}"
+KIND_CONTAINER="${CLUSTER_NAME}-control-plane"
+KIND_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${KIND_CONTAINER}" 2>/dev/null | tr ' ' '\n' | grep -v '^$' | head -1)
+if [ -n "${KIND_IP}" ]; then
+    echo "  Patching kubeconfig server to https://${KIND_IP}:6443 (kind node IP)"
+    kubectl config set-cluster "kind-${CLUSTER_NAME}" --server="https://${KIND_IP}:6443"
+else
+    echo "  Warning: could not determine kind node IP, using default kubeconfig"
+fi
 
 # ── 4. Load Docker image into Kind ───────────────────────────
 echo ""
