@@ -21,11 +21,24 @@ services:
     networks:
       - arcana-ci-rust-net
 
+  redis:
+    image: redis:7-alpine
+    container_name: arcana-ci-rust-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - arcana-ci-rust-net
+
   repository:
     image: ${RUST_IMAGE:-localhost:5000/arcana/rust-app:latest}
     container_name: arcana-ci-rust-repository
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       RUST_LOG: info
@@ -34,6 +47,7 @@ services:
       ARCANA__APP__ENVIRONMENT: ci
       ARCANA__DEPLOYMENT__MODE: layeredgrpc
       ARCANA__DEPLOYMENT__LAYER: repository
+      ARCANA__REDIS__URL: "redis://redis:6379"
       ARCANA__SERVER__GRPC_HOST: 0.0.0.0
       ARCANA__SERVER__GRPC_PORT: "9090"
       ARCANA__DATABASE__URL: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
@@ -62,6 +76,7 @@ services:
       ARCANA__APP__ENVIRONMENT: ci
       ARCANA__DEPLOYMENT__MODE: layeredgrpc
       ARCANA__DEPLOYMENT__LAYER: service
+      ARCANA__REDIS__URL: "redis://redis:6379"
       ARCANA__SERVER__GRPC_HOST: 0.0.0.0
       ARCANA__SERVER__GRPC_PORT: "9090"
       ARCANA__DEPLOYMENT__REPOSITORY_URL: http://arcana-ci-rust-repository:9090
@@ -90,6 +105,7 @@ services:
       ARCANA__APP__ENVIRONMENT: ci
       ARCANA__DEPLOYMENT__MODE: layeredgrpc
       ARCANA__DEPLOYMENT__LAYER: controller
+      ARCANA__REDIS__URL: "redis://redis:6379"
       ARCANA__SERVER__REST_HOST: 0.0.0.0
       ARCANA__SERVER__REST_PORT: "8080"
       ARCANA__DEPLOYMENT__SERVICE_URL: http://arcana-ci-rust-service:9090
