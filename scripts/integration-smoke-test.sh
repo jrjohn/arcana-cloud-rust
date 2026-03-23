@@ -57,10 +57,8 @@ if [ "${LOGIN_HTTP_CODE}" != "200" ]; then
   exit 1
 fi
 
-TOKEN=$(python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('access_token',''))" \
-    < /tmp/smoke-login-${LABEL}.json 2>/dev/null || echo "")
-USER_ID=$(python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('user',{}).get('id',''))" \
-    < /tmp/smoke-login-${LABEL}.json 2>/dev/null || echo "")
+TOKEN=$(node -e "const d=require('fs').readFileSync('/tmp/smoke-login-${LABEL}.json','utf8');const j=JSON.parse(d);console.log((j.data||{}).access_token||'')" 2>/dev/null || echo "")
+USER_ID=$(node -e "const d=require('fs').readFileSync('/tmp/smoke-login-${LABEL}.json','utf8');const j=JSON.parse(d);console.log(((j.data||{}).user||{}).id||'')" 2>/dev/null || echo "")
 if [ -z "${TOKEN}" ]; then
   echo "  ✗ No access_token in login response"
   cat /tmp/smoke-login-${LABEL}.json 2>/dev/null || true
@@ -82,8 +80,7 @@ if [ "${ME_HTTP_CODE}" != "200" ]; then
   exit 1
 fi
 
-ME_USER=$(python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('username','?'))" \
-    < /tmp/smoke-me-${LABEL}.json 2>/dev/null || echo "?")
+ME_USER=$(node -e "const d=require('fs').readFileSync('/tmp/smoke-me-${LABEL}.json','utf8');const j=JSON.parse(d);console.log((j.data||{}).username||'?')" 2>/dev/null || echo "?")
 echo "  ✓ Auth call OK — user: ${ME_USER}"
 
 echo ""
