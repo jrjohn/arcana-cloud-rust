@@ -10,8 +10,8 @@ use arcana_core::{module, ArcanaResult, HasComponent};
 use arcana_grpc::RemoteUserRepository;
 use arcana_repository::{
     DatabasePool, DatabasePoolInterface,
-    MySqlUserDaoImpl, MySqlUserRepository,
-    UserDao, UserRepository, UserRepositoryImpl,
+    MySqlUserDaoImpl,
+    UserRepository, UserRepositoryImpl,
 };
 use arcana_security::{PasswordHasher, PasswordHasherInterface, TokenProvider, TokenProviderInterface};
 use arcana_service::{AuthService, AuthServiceComponent, CacheInterface, RedisCacheService, RedisCacheServiceParameters, UserService, UserServiceComponent};

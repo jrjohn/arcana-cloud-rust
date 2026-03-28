@@ -13,6 +13,28 @@ use shaku::Component;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+/// Error message for inactive account status.
+const ACCOUNT_NOT_ACTIVE_MSG: &str = "Account is not active";
+/// Error message for suspended account status.
+const ACCOUNT_SUSPENDED_MSG: &str = "Account is suspended";
+/// Error message for locked account status.
+const ACCOUNT_LOCKED_MSG: &str = "Account is locked";
+/// Error message for missing user ID in refresh token.
+const REFRESH_TOKEN_MISSING_USER_ID_MSG: &str = "Invalid refresh token: missing user ID";
+/// Error message for missing user ID in token.
+const TOKEN_MISSING_USER_ID_MSG: &str = "Invalid token: missing user ID";
+/// Error message when user no longer exists during token refresh.
+const USER_NO_LONGER_EXISTS_MSG: &str = "User no longer exists";
+/// Creates a conflict message for duplicate username.
+fn conflict_username_msg(username: &str) -> String {
+    format!("Username '{}' already exists", username)
+}
+
+/// Creates a conflict message for duplicate email.
+fn conflict_email_msg(email: &str) -> String {
+    format!("Email '{}' already exists", email)
+}
+
 /// Authentication service trait.
 #[async_trait]
 pub trait AuthService: Interface + Send + Sync {
@@ -93,18 +115,16 @@ impl<R: UserRepository + 'static> AuthService for AuthServiceImpl<R> {
 
         // Check for existing username
         if self.user_repository.exists_by_username(&request.username).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Username '{}' already exists",
-                request.username
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_username_msg(&request.username),
+            ));
         }
 
         // Check for existing email
         if self.user_repository.exists_by_email(&request.email).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Email '{}' already exists",
-                request.email
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_email_msg(&request.email),
+            ));
         }
 
         // Parse email
@@ -155,10 +175,10 @@ impl<R: UserRepository + 'static> AuthService for AuthServiceImpl<R> {
         if !user.status.can_login() {
             warn!("Login failed: user status {:?} - {}", user.status, user.id);
             return Err(match user.status {
-                UserStatus::Suspended => ArcanaError::Forbidden("Account is suspended".to_string()),
-                UserStatus::Locked => ArcanaError::Forbidden("Account is locked".to_string()),
+                UserStatus::Suspended => ArcanaError::Forbidden(ACCOUNT_SUSPENDED_MSG.to_string()),
+                UserStatus::Locked => ArcanaError::Forbidden(ACCOUNT_LOCKED_MSG.to_string()),
                 UserStatus::Deleted => ArcanaError::InvalidCredentials,
-                _ => ArcanaError::Forbidden("Account is not active".to_string()),
+                _ => ArcanaError::Forbidden(ACCOUNT_NOT_ACTIVE_MSG.to_string()),
             });
         }
 
@@ -187,17 +207,17 @@ impl<R: UserRepository + 'static> AuthService for AuthServiceImpl<R> {
 
         // Get user to ensure they still exist and are active
         let user_id = claims.user_id().ok_or_else(|| {
-            ArcanaError::InvalidToken("Invalid refresh token: missing user ID".to_string())
+            ArcanaError::InvalidToken(REFRESH_TOKEN_MISSING_USER_ID_MSG.to_string())
         })?;
 
         let user = self
             .user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| ArcanaError::InvalidToken("User no longer exists".to_string()))?;
+            .ok_or_else(|| ArcanaError::InvalidToken(USER_NO_LONGER_EXISTS_MSG.to_string()))?;
 
         if !user.status.can_login() {
-            return Err(ArcanaError::Forbidden("Account is not active".to_string()));
+            return Err(ArcanaError::Forbidden(ACCOUNT_NOT_ACTIVE_MSG.to_string()));
         }
 
         info!("Token refreshed for user: {}", user.id);
@@ -222,7 +242,7 @@ impl<R: UserRepository + 'static> AuthService for AuthServiceImpl<R> {
 
     async fn get_current_user(&self, claims: &Claims) -> ArcanaResult<AuthUserInfo> {
         let user_id = claims.user_id().ok_or_else(|| {
-            ArcanaError::InvalidToken("Invalid token: missing user ID".to_string())
+            ArcanaError::InvalidToken(TOKEN_MISSING_USER_ID_MSG.to_string())
         })?;
 
         let user = self
@@ -298,17 +318,15 @@ impl AuthService for AuthServiceComponent {
         request.validate_request()?;
 
         if self.user_repository.exists_by_username(&request.username).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Username '{}' already exists",
-                request.username
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_username_msg(&request.username),
+            ));
         }
 
         if self.user_repository.exists_by_email(&request.email).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Email '{}' already exists",
-                request.email
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_email_msg(&request.email),
+            ));
         }
 
         let email = Email::new(&request.email)
@@ -350,10 +368,10 @@ impl AuthService for AuthServiceComponent {
         if !user.status.can_login() {
             warn!("Login failed: user status {:?} - {}", user.status, user.id);
             return Err(match user.status {
-                UserStatus::Suspended => ArcanaError::Forbidden("Account is suspended".to_string()),
-                UserStatus::Locked => ArcanaError::Forbidden("Account is locked".to_string()),
+                UserStatus::Suspended => ArcanaError::Forbidden(ACCOUNT_SUSPENDED_MSG.to_string()),
+                UserStatus::Locked => ArcanaError::Forbidden(ACCOUNT_LOCKED_MSG.to_string()),
                 UserStatus::Deleted => ArcanaError::InvalidCredentials,
-                _ => ArcanaError::Forbidden("Account is not active".to_string()),
+                _ => ArcanaError::Forbidden(ACCOUNT_NOT_ACTIVE_MSG.to_string()),
             });
         }
 
@@ -377,17 +395,17 @@ impl AuthService for AuthServiceComponent {
         let claims = self.token_provider.validate_refresh_token(&request.refresh_token)?;
 
         let user_id = claims.user_id().ok_or_else(|| {
-            ArcanaError::InvalidToken("Invalid refresh token: missing user ID".to_string())
+            ArcanaError::InvalidToken(REFRESH_TOKEN_MISSING_USER_ID_MSG.to_string())
         })?;
 
         let user = self
             .user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| ArcanaError::InvalidToken("User no longer exists".to_string()))?;
+            .ok_or_else(|| ArcanaError::InvalidToken(USER_NO_LONGER_EXISTS_MSG.to_string()))?;
 
         if !user.status.can_login() {
-            return Err(ArcanaError::Forbidden("Account is not active".to_string()));
+            return Err(ArcanaError::Forbidden(ACCOUNT_NOT_ACTIVE_MSG.to_string()));
         }
 
         info!("Token refreshed for user: {}", user.id);
@@ -408,7 +426,7 @@ impl AuthService for AuthServiceComponent {
 
     async fn get_current_user(&self, claims: &Claims) -> ArcanaResult<AuthUserInfo> {
         let user_id = claims.user_id().ok_or_else(|| {
-            ArcanaError::InvalidToken("Invalid token: missing user ID".to_string())
+            ArcanaError::InvalidToken(TOKEN_MISSING_USER_ID_MSG.to_string())
         })?;
 
         let user = self

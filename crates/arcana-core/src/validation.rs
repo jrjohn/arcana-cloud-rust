@@ -7,7 +7,7 @@ use validator::{Validate, ValidationErrors};
 pub trait ValidateExt: Validate {
     /// Validates the struct and returns an `ArcanaError` on failure.
     fn validate_request(&self) -> Result<(), ArcanaError> {
-        self.validate().map_err(|e| validation_errors_to_arcana_error(e))
+        self.validate().map_err(validation_errors_to_arcana_error)
     }
 }
 

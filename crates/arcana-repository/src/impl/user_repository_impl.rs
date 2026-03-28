@@ -19,7 +19,7 @@
 //! [`UserDao`]: crate::dao::UserDao
 
 use crate::{dao::UserDao, traits::UserRepository};
-use arcana_core::{ArcanaResult, Interface, Page, PageRequest, UserId};
+use arcana_core::{ArcanaResult, Page, PageRequest, UserId};
 use arcana_core::{User, UserRole};
 use async_trait::async_trait;
 use shaku::Component;
