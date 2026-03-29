@@ -8,9 +8,11 @@
 //! ```text
 //! src/
 //!   user_service.rs          ← UserService trait
+//!   auth_service.rs          ← AuthService trait
 //!   impl/
 //!     mod.rs                 ← pub use declarations
 //!     user_service_impl.rs   ← UserServiceImpl + UserServiceComponent
+//!     auth_service_impl.rs   ← AuthServiceImpl + AuthServiceComponent
 //! ```
 
 pub mod cache;
@@ -24,4 +26,4 @@ pub use cache::*;
 pub use dto::*;
 pub use user_service::*;
 pub use auth_service::*;
-pub use r#impl::{UserServiceComponent, UserServiceImpl};
+pub use r#impl::{UserServiceComponent, UserServiceImpl, AuthServiceComponent, AuthServiceImpl};
