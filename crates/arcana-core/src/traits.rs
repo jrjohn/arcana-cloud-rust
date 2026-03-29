@@ -176,3 +176,45 @@ impl HealthStatus {
         matches!(self, Self::Unhealthy(_))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_status_is_healthy_returns_true_for_healthy() {
+        assert!(HealthStatus::Healthy.is_healthy());
+    }
+
+    #[test]
+    fn health_status_is_healthy_returns_false_for_degraded() {
+        assert!(!HealthStatus::Degraded("slow".to_string()).is_healthy());
+    }
+
+    #[test]
+    fn health_status_is_healthy_returns_false_for_unhealthy() {
+        assert!(!HealthStatus::Unhealthy("down".to_string()).is_healthy());
+    }
+
+    #[test]
+    fn health_status_is_unhealthy_returns_true_for_unhealthy() {
+        assert!(HealthStatus::Unhealthy("db connection lost".to_string()).is_unhealthy());
+    }
+
+    #[test]
+    fn health_status_is_unhealthy_returns_false_for_healthy() {
+        assert!(!HealthStatus::Healthy.is_unhealthy());
+    }
+
+    #[test]
+    fn health_status_is_unhealthy_returns_false_for_degraded() {
+        assert!(!HealthStatus::Degraded("high latency".to_string()).is_unhealthy());
+    }
+
+    #[test]
+    fn health_status_clone_and_debug() {
+        let status = HealthStatus::Degraded("test".to_string());
+        let cloned = status.clone();
+        assert!(format!("{:?}", cloned).contains("Degraded"));
+    }
+}

@@ -80,3 +80,65 @@ pub async fn require_auth(
 
     Ok(next.run(request).await)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arcana_config::SecurityConfig;
+    use std::sync::Arc;
+
+    #[test]
+    fn auth_middleware_state_new_stores_token_provider() {
+        let config = Arc::new(SecurityConfig {
+            jwt_secret: "test-secret-at-least-32-chars-long!!".to_string(),
+            jwt_access_expiration_secs: 3600,
+            jwt_refresh_expiration_secs: 604800,
+            jwt_issuer: "test".to_string(),
+            jwt_audience: "test".to_string(),
+            grpc_tls_enabled: false,
+            tls_cert_path: None,
+            tls_key_path: None,
+            password_hash_cost: 4,
+        });
+        let provider = Arc::new(TokenProvider::new(config));
+        let state = AuthMiddlewareState::new(provider as Arc<dyn TokenProviderInterface>);
+        // Verify state was created without panicking
+        let _ = state.token_provider.clone();
+    }
+
+    #[test]
+    fn auth_middleware_state_from_provider_creates_state() {
+        let config = Arc::new(SecurityConfig {
+            jwt_secret: "test-secret-at-least-32-chars-long!!".to_string(),
+            jwt_access_expiration_secs: 3600,
+            jwt_refresh_expiration_secs: 604800,
+            jwt_issuer: "test".to_string(),
+            jwt_audience: "test".to_string(),
+            grpc_tls_enabled: false,
+            tls_cert_path: None,
+            tls_key_path: None,
+            password_hash_cost: 4,
+        });
+        let provider = Arc::new(TokenProvider::new(config));
+        let state = AuthMiddlewareState::from_provider(provider);
+        let _ = state.token_provider.clone();
+    }
+
+    #[test]
+    fn auth_middleware_state_clone() {
+        let config = Arc::new(SecurityConfig {
+            jwt_secret: "test-secret-at-least-32-chars-long!!".to_string(),
+            jwt_access_expiration_secs: 3600,
+            jwt_refresh_expiration_secs: 604800,
+            jwt_issuer: "test".to_string(),
+            jwt_audience: "test".to_string(),
+            grpc_tls_enabled: false,
+            tls_cert_path: None,
+            tls_key_path: None,
+            password_hash_cost: 4,
+        });
+        let provider = Arc::new(TokenProvider::new(config));
+        let state = AuthMiddlewareState::new(provider as Arc<dyn TokenProviderInterface>);
+        let _cloned = state.clone();
+    }
+}
