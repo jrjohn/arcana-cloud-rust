@@ -76,4 +76,24 @@ mod tests {
         let key = email_exists("Test@Example.COM");
         assert_eq!(key, "arcana:cache:exists:email:test@example.com");
     }
+
+    #[test]
+    fn test_user_invalidation_pattern() {
+        let id = UserId::new();
+        let pattern = user_invalidation_pattern(id);
+        assert!(pattern.starts_with("arcana:cache:user:*:"));
+        assert!(pattern.contains(&id.to_string()));
+    }
+
+    #[test]
+    fn test_username_exists_pattern() {
+        let pattern = username_exists_pattern();
+        assert_eq!(pattern, "arcana:cache:exists:username:*");
+    }
+
+    #[test]
+    fn test_email_exists_pattern() {
+        let pattern = email_exists_pattern();
+        assert_eq!(pattern, "arcana:cache:exists:email:*");
+    }
 }
