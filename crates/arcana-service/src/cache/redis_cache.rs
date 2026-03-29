@@ -96,7 +96,7 @@ impl CacheInterface for RedisCacheService {
         }
 
         let mut conn = self.get_conn().await?;
-        let ttl_secs = ttl.as_secs().max(1) as u64;
+        let ttl_secs = ttl.as_secs().max(1);
 
         conn.set_ex::<_, _, ()>(key, value, ttl_secs).await.map_err(|e| {
             ArcanaError::Cache(format!("Failed to set key '{}': {}", key, e))

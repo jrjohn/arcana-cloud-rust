@@ -1,0 +1,129 @@
+# arcana-cloud-rust — 3-layer gRPC CI compose
+# Usage: RUST_IMAGE=localhost:5000/arcana/rust-app:build-N docker compose -p arcana-ci-rust-grpc -f deployment/layered/docker-compose-ci-grpc.yml up -d
+version: '3.8'
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: arcana-ci-rust-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ci_root
+      MYSQL_DATABASE: arcana_cloud
+      MYSQL_USER: arcana
+      MYSQL_PASSWORD: ci_arcana
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - arcana-ci-rust-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: arcana-ci-rust-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - arcana-ci-rust-net
+
+  repository:
+    image: ${RUST_IMAGE:-localhost:5000/arcana/rust-app:latest}
+    container_name: arcana-ci-rust-repository
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info
+      ARCANA_ENVIRONMENT: ci
+      ARCANA_DEPLOYMENT_MODE: layeredgrpc
+      ARCANA__APP__ENVIRONMENT: ci
+      ARCANA__DEPLOYMENT__MODE: layeredgrpc
+      ARCANA__DEPLOYMENT__LAYER: repository
+      ARCANA__REDIS__URL: "redis://redis:6379"
+      ARCANA__SERVER__GRPC_HOST: 0.0.0.0
+      ARCANA__SERVER__GRPC_PORT: "9090"
+      ARCANA__DATABASE__URL: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
+      ARCANA__SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
+      ARCANA__SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA__SECURITY__JWT_AUDIENCE: arcana-api
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/9090 2>/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - arcana-ci-rust-net
+
+  service:
+    image: ${RUST_IMAGE:-localhost:5000/arcana/rust-app:latest}
+    container_name: arcana-ci-rust-service
+    depends_on:
+      repository:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info
+      ARCANA_ENVIRONMENT: ci
+      ARCANA_DEPLOYMENT_MODE: layeredgrpc
+      ARCANA__APP__ENVIRONMENT: ci
+      ARCANA__DEPLOYMENT__MODE: layeredgrpc
+      ARCANA__DEPLOYMENT__LAYER: service
+      ARCANA__REDIS__URL: "redis://redis:6379"
+      ARCANA__SERVER__GRPC_HOST: 0.0.0.0
+      ARCANA__SERVER__GRPC_PORT: "9090"
+      ARCANA__DEPLOYMENT__REPOSITORY_URL: http://arcana-ci-rust-repository:9090
+      ARCANA__SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
+      ARCANA__SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA__SECURITY__JWT_AUDIENCE: arcana-api
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/9090 2>/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - arcana-ci-rust-net
+
+  controller:
+    image: ${RUST_IMAGE:-localhost:5000/arcana/rust-app:latest}
+    container_name: arcana-ci-rust-controller
+    depends_on:
+      service:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info
+      ARCANA_ENVIRONMENT: ci
+      ARCANA_DEPLOYMENT_MODE: layeredgrpc
+      ARCANA__APP__ENVIRONMENT: ci
+      ARCANA__DEPLOYMENT__MODE: layeredgrpc
+      ARCANA__DEPLOYMENT__LAYER: controller
+      ARCANA__REDIS__URL: "redis://redis:6379"
+      ARCANA__SERVER__REST_HOST: 0.0.0.0
+      ARCANA__SERVER__REST_PORT: "8080"
+      ARCANA__DEPLOYMENT__SERVICE_URL: http://arcana-ci-rust-service:9090
+      ARCANA__SECURITY__JWT_SECRET: "ci-secret-key-minimum-32-characters-for-testing"
+      ARCANA__SECURITY__JWT_ISSUER: arcana-cloud
+      ARCANA__SECURITY__JWT_AUDIENCE: arcana-api
+    ports:
+      - "18094:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - arcana-ci-rust-net
+
+networks:
+  arcana-ci-rust-net:
+    driver: bridge
+    name: arcana-ci-rust-net

@@ -6,7 +6,7 @@ use crate::dto::{
     UpdateUserStatusRequest, UserListResponse, UserResponse,
 };
 use crate::user_service::UserService;
-use arcana_core::{ArcanaError, ArcanaResult, Interface, PageRequest, UserId, ValidateExt};
+use arcana_core::{ArcanaError, ArcanaResult, PageRequest, UserId, ValidateExt};
 use arcana_core::{Email, User};
 use arcana_repository::UserRepository;
 use arcana_security::{PasswordHasher, PasswordHasherInterface};
@@ -14,6 +14,16 @@ use async_trait::async_trait;
 use shaku::Component;
 use std::sync::Arc;
 use tracing::{debug, info};
+
+/// Creates a conflict message for duplicate username.
+fn conflict_username_msg(username: &str) -> String {
+    format!("Username '{}' already exists", username)
+}
+
+/// Creates a conflict message for duplicate email.
+fn conflict_email_msg(email: &str) -> String {
+    format!("Email '{}' already exists", email)
+}
 
 /// Generic user service implementation (non-DI).
 pub struct UserServiceImpl<R: UserRepository> {
@@ -41,18 +51,16 @@ impl<R: UserRepository + 'static> UserService for UserServiceImpl<R> {
 
         // Check for existing username
         if self.user_repository.exists_by_username(&request.username).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Username '{}' already exists",
-                request.username
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_username_msg(&request.username),
+            ));
         }
 
         // Check for existing email
         if self.user_repository.exists_by_email(&request.email).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Email '{}' already exists",
-                request.email
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_email_msg(&request.email),
+            ));
         }
 
         // Parse and validate email
@@ -240,17 +248,15 @@ impl UserService for UserServiceComponent {
         request.validate_request()?;
 
         if self.user_repository.exists_by_username(&request.username).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Username '{}' already exists",
-                request.username
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_username_msg(&request.username),
+            ));
         }
 
         if self.user_repository.exists_by_email(&request.email).await? {
-            return Err(ArcanaError::Conflict(format!(
-                "Email '{}' already exists",
-                request.email
-            )));
+            return Err(ArcanaError::conflict(
+                conflict_email_msg(&request.email),
+            ));
         }
 
         let email = Email::new(&request.email)

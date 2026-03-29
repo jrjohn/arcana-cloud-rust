@@ -20,6 +20,9 @@ use axum::{
 };
 use tracing::debug;
 
+/// Error message for missing user ID in JWT claims.
+const MISSING_USER_ID_MSG: &str = "Missing user ID in token";
+
 /// Creates the user router.
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -121,7 +124,7 @@ pub async fn get_user(
 
     // Users can view themselves, admins can view anyone
     let current_user_id = user.user_id().ok_or_else(|| {
-        AppError(ArcanaError::Internal("Missing user ID in token".to_string()))
+        AppError(ArcanaError::Internal(MISSING_USER_ID_MSG.to_string()))
     })?;
 
     if current_user_id != user_id {
@@ -165,7 +168,7 @@ pub async fn update_user(
 
     // Users can update themselves, admins can update anyone
     let current_user_id = user.user_id().ok_or_else(|| {
-        AppError(ArcanaError::Internal("Missing user ID in token".to_string()))
+        AppError(ArcanaError::Internal(MISSING_USER_ID_MSG.to_string()))
     })?;
 
     if current_user_id != user_id {
@@ -320,7 +323,7 @@ pub async fn change_password(
 
     // Users can only change their own password
     let current_user_id = user.user_id().ok_or_else(|| {
-        AppError(ArcanaError::Internal("Missing user ID in token".to_string()))
+        AppError(ArcanaError::Internal(MISSING_USER_ID_MSG.to_string()))
     })?;
 
     if current_user_id != user_id {
