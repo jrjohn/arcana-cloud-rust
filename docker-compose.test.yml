@@ -5,7 +5,10 @@ services:
       dockerfile: Dockerfile.ci
       target: builder
     working_dir: /app
-    command: ["sh", "-c", "cargo test --workspace --no-fail-fast 2>&1 || true"]
+    # No trailing `|| true`: the Unit Tests Jenkins stage is now a blocking gate, so a
+    # non-zero cargo exit must propagate out of `docker compose run`. --no-fail-fast
+    # still runs every test (so all failures are reported) before returning non-zero.
+    command: ["sh", "-c", "cargo test --workspace --no-fail-fast 2>&1"]
 
   coverage:
     # ARM64-native: cargo-llvm-cov (tarpaulin is x86_64 only)
