@@ -5,10 +5,14 @@ services:
       dockerfile: Dockerfile.ci
       target: builder
     working_dir: /app
-    # No trailing `|| true`: the Unit Tests Jenkins stage is now a blocking gate, so a
-    # non-zero cargo exit must propagate out of `docker compose run`. --no-fail-fast
-    # still runs every test (so all failures are reported) before returning non-zero.
-    command: ["sh", "-c", "cargo test --workspace --no-fail-fast 2>&1"]
+    # Blocking gate: no trailing `|| true`, so a non-zero cargo exit propagates out of
+    # `docker compose run`. Scope to --lib --bins: the only `tests/` integration target,
+    # arcana-repository/tests/user_repository_test.rs, spins up a MySQL testcontainer and
+    # needs /var/run/docker.sock, which this lane has no access to (SocketNotFoundError).
+    # That matches the coverage lane's existing `--lib` choice ("skip database integration
+    # tests that require a live DB"); those DB tests belong in a DB-provisioned lane.
+    # --no-fail-fast still runs every unit test before returning non-zero.
+    command: ["sh", "-c", "cargo test --workspace --lib --bins --no-fail-fast 2>&1"]
 
   coverage:
     # ARM64-native: cargo-llvm-cov (tarpaulin is x86_64 only)
