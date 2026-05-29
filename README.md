@@ -1,5 +1,12 @@
 # Arcana Cloud Rust
 
+<!-- agent-managed badges START -->
+[![Quality Gate](https://arcana.boo/sonarqube/api/project_badges/quality_gate?project=rust-app)](https://arcana.boo/sonarqube/dashboard?id=rust-app)
+[![Build](https://arcana.boo/jenkins/buildStatus/icon?job=rust-app-pipeline-mb/main)](https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/)
+
+**Rank**: Quality Gate `OK` · Build `blue` · Sonar coverage not imported (lcov export pending DinD fix)
+<!-- agent-managed badges END -->
+
 [![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-8.95%2F10-brightgreen)](https://github.com/jrjohn/arcana-cloud-rust#architecture-evaluation)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tokio](https://img.shields.io/badge/Tokio-1.43-blue)](https://tokio.rs/)

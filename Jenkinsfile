@@ -60,10 +60,11 @@ pipeline {
         }
 
         stage("Unit Tests") {
+            // Blocking: a failing cargo test now fails the build. The inner `|| true`
+            // was removed from docker-compose.test.yml's test command so the non-zero
+            // cargo exit propagates out of `docker compose run`.
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh "docker compose -f docker-compose.test.yml run --rm --build test"
-                }
+                sh "docker compose -f docker-compose.test.yml run --rm --build test"
             }
         }
 
@@ -87,22 +88,23 @@ pipeline {
         }
 
         stage("Integration: Layered gRPC") {
+            // Blocking: a failing layered-gRPC smoke test now fails the build. The
+            // teardown / network connect-disconnect lines keep their `|| true` (cleanup
+            // must not fail); the gate is integration-smoke-test.sh's own exit code.
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh '''
-                        JENKINS_ID=$(hostname)
-                        RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
-                            -f deployment/layered/docker-compose-ci-grpc.yml \
-                            down -v --remove-orphans 2>/dev/null || true
-                        RUST_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
-                        docker compose -p arcana-ci-rust-grpc \
-                            -f deployment/layered/docker-compose-ci-grpc.yml up -d
-                        docker network connect arcana-ci-rust-net $JENKINS_ID 2>/dev/null || true
-                        bash scripts/integration-smoke-test.sh \
-                            http://arcana-ci-rust-controller:8080 grpc-layered 240
-                        docker network disconnect arcana-ci-rust-net $JENKINS_ID 2>/dev/null || true
-                    '''
-                }
+                sh '''
+                    JENKINS_ID=$(hostname)
+                    RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
+                        -f deployment/layered/docker-compose-ci-grpc.yml \
+                        down -v --remove-orphans 2>/dev/null || true
+                    RUST_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
+                    docker compose -p arcana-ci-rust-grpc \
+                        -f deployment/layered/docker-compose-ci-grpc.yml up -d
+                    docker network connect arcana-ci-rust-net $JENKINS_ID 2>/dev/null || true
+                    bash scripts/integration-smoke-test.sh \
+                        http://arcana-ci-rust-controller:8080 grpc-layered 240
+                    docker network disconnect arcana-ci-rust-net $JENKINS_ID 2>/dev/null || true
+                '''
             }
             post {
                 always {
@@ -117,14 +119,13 @@ pipeline {
         }
 
         stage("Integration: K8s gRPC") {
+            // Blocking: a failing kind/k8s gRPC smoke test now fails the build.
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh '''#!/bin/bash
-                        export PATH="/var/jenkins_home/bin:${PATH}"
-                        kind version || { echo "kind not found"; exit 1; }
-                        bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
-                    '''
-                }
+                sh '''#!/bin/bash
+                    export PATH="/var/jenkins_home/bin:${PATH}"
+                    kind version || { echo "kind not found"; exit 1; }
+                    bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
+                '''
             }
             post {
                 always {
@@ -139,43 +140,82 @@ pipeline {
         }
 
         stage("SonarQube Analysis") {
+            // Blocking quality gate. NO sonar.pullrequest.* params: this is SonarQube
+            // Community Build, which rejects them ("Developer Edition or above is
+            // required") and fails the scan. Analyze every branch/PR with the plain
+            // project key. waitForQualityGate() needs a server->Jenkins webhook (not
+            // configured here), so poll the compute-engine task named in
+            // .scannerwork/report-task.txt, then read the gate status; exit 1 if not OK.
+            // The jenkins agent has only curl (no jq), so parse JSON with grep.
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    withSonarQubeEnv('SonarQube') {
-                        script {
-                            def prArgs = env.CHANGE_ID ? """ \
-                                -Dsonar.pullrequest.key=${env.CHANGE_ID} \
-                                -Dsonar.pullrequest.branch=${env.BRANCH_NAME} \
-                                -Dsonar.pullrequest.base=${env.CHANGE_TARGET}""" : ''
-                            sh """sonar-scanner \
-                              -Dsonar.projectKey=rust-app \
-                              -Dsonar.projectName="Rust App" \
-                              -Dsonar.sources=crates \
-                              -Dsonar.exclusions=target/**,**/target/**,**/*.proto \
-                              -Dsonar.rust.clippy.enabled=false \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.rust.lcov.reportPaths=coverage/lcov.info${prArgs}"""
-                        }
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh """sonar-scanner \
+                      -Dsonar.projectKey=rust-app \
+                      -Dsonar.projectName="Rust App" \
+                      -Dsonar.sources=crates \
+                      -Dsonar.exclusions=target/**,**/target/**,**/*.proto \
+                      -Dsonar.rust.clippy.enabled=false \
+                      -Dsonar.scm.disabled=true \
+                      -Dsonar.rust.lcov.reportPaths=coverage/lcov.info"""
+                    sh '''
+                        set -e
+                        TOKEN="${SONAR_AUTH_TOKEN:-$SONAR_TOKEN}"
+                        RT=.scannerwork/report-task.txt
+                        [ -f "$RT" ] || { echo "report-task.txt not found — scanner did not run"; exit 1; }
+                        CE_TASK_ID=$(grep '^ceTaskId=' "$RT" | cut -d= -f2-)
+                        echo "CE task id: $CE_TASK_ID"
+                        ANALYSIS_ID=""
+                        for i in $(seq 1 60); do
+                            RESP=$(curl -s -u "$TOKEN:" "$SONAR_HOST_URL/api/ce/task?id=$CE_TASK_ID")
+                            ST=$(echo "$RESP" | grep -o '"status":"[A-Z_]*"' | head -1 | cut -d'"' -f4)
+                            echo "  CE status: ${ST:-?} (try $i)"
+                            if [ "$ST" = "SUCCESS" ]; then
+                                ANALYSIS_ID=$(echo "$RESP" | grep -o '"analysisId":"[^"]*"' | head -1 | cut -d'"' -f4)
+                                break
+                            elif [ "$ST" = "FAILED" ] || [ "$ST" = "CANCELED" ]; then
+                                echo "CE task ended $ST"; exit 1
+                            fi
+                            sleep 5
+                        done
+                        [ -n "$ANALYSIS_ID" ] || { echo "CE task did not finish in time"; exit 1; }
+                        GATE=$(curl -s -u "$TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID")
+                        GST=$(echo "$GATE" | grep -o '"status":"[A-Z]*"' | head -1 | cut -d'"' -f4)
+                        echo "Quality gate: ${GST:-UNKNOWN}"
+                        if [ "$GST" != "OK" ]; then
+                            echo "--- gate response ---"; echo "$GATE"
+                            exit 1
+                        fi
+                    '''
                 }
             }
         }
 
         stage("Architecture Qube") {
+            // Blocking: arch-qube exits non-zero if the architecture score is below
+            // --threshold 90. DinD-safe: this Jenkins talks to the HOST daemon, so a
+            // `-v $(pwd):/project` bind mount resolves to a stray host path and scans an
+            // empty tree (which is why the old `|| true` gate was fake). Instead copy the
+            // source IN via a tar stream and the report OUT with docker cp, both through
+            // anonymous volumes (/src, /output) that exist for the container.
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh '''
-                        mkdir -p arch-qube-reports
-                        docker run --rm \
-                            --network devops_default \
-                            -v $(pwd):/project \
-                            -v $(pwd)/arch-qube-reports:/output \
-                            arcana.boo/arcana/arch-qube:latest scan /project \
-                            --framework rust --no-ai \
-                            --ci --format json,markdown \
-                            -o /output --threshold 90 || true
-                    '''
-                }
+                sh '''
+                    docker rm -f arcana-arch-qube 2>/dev/null || true
+                    docker create --name arcana-arch-qube --network devops_default \
+                        -v /src -v /output \
+                        arcana.boo/arcana/arch-qube:latest \
+                        scan /src --framework rust --no-ai --ci \
+                        --format json,markdown -o /output --threshold 90 || exit 1
+                    tar --exclude=./.git --exclude=./target --exclude=./.scannerwork \
+                        --exclude=./coverage --exclude=./arch-qube-reports \
+                        -C . -cf - . \
+                        | docker cp - arcana-arch-qube:/src || exit 1
+                    docker start -a arcana-arch-qube
+                    AQ_RC=$?
+                    mkdir -p arch-qube-reports
+                    docker cp arcana-arch-qube:/output/. arch-qube-reports/ 2>/dev/null || true
+                    docker rm -f arcana-arch-qube 2>/dev/null || true
+                    exit $AQ_RC
+                '''
             }
         }
 
