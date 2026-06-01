@@ -12,7 +12,7 @@
 <!-- agent-managed badges START -->
 <p align="center">
   <a href="https://arcana.boo/sonarqube/dashboard?id=rust-app"><img src="https://img.shields.io/badge/Quality_Gate-OK-brightgreen?style=for-the-badge" alt="Quality Gate"></a>
-  <a href="https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/"><img src="https://img.shields.io/badge/Build-building-blue?style=for-the-badge" alt="Build"></a>
+  <a href="https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/"><img src="https://img.shields.io/badge/Build-passing-brightgreen?style=for-the-badge" alt="Build"></a>
 </p>
 <!-- agent-managed badges END -->
 
