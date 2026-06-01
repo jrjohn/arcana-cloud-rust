@@ -1,12 +1,5 @@
 # Arcana Cloud Rust
 
-<!-- agent-managed badges START -->
-[![Quality Gate](https://img.shields.io/badge/Quality_Gate-OK-brightgreen)](https://arcana.boo/sonarqube/dashboard?id=rust-app)
-[![Build](https://img.shields.io/badge/Build-building-blue)](https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/)
-
-**Rank**: Quality Gate `OK` · Build `blue` · Sonar coverage not imported (lcov export pending DinD fix)
-<!-- agent-managed badges END -->
-
 [![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-8.95%2F10-brightgreen)](https://github.com/jrjohn/arcana-cloud-rust#architecture-evaluation)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tokio](https://img.shields.io/badge/Tokio-1.43-blue)](https://tokio.rs/)
@@ -15,6 +8,13 @@
 [![Wasmtime](https://img.shields.io/badge/Wasmtime-27-purple)](https://wasmtime.dev/)
 [![Tests](https://img.shields.io/badge/Tests-150%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+<!-- agent-managed badges START -->
+<p align="center">
+  <a href="https://arcana.boo/sonarqube/dashboard?id=rust-app"><img src="https://img.shields.io/badge/Quality_Gate-OK-brightgreen?style=for-the-badge" alt="Quality Gate"></a>
+  <a href="https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/"><img src="https://img.shields.io/badge/Build-building-blue?style=for-the-badge" alt="Build"></a>
+</p>
+<!-- agent-managed badges END -->
 
 Enterprise-grade Rust microservices framework implementing Clean Architecture with dual-protocol support (REST/gRPC), WASM plugin system, and comprehensive resilience patterns. Achieves **2.1x performance improvement** with gRPC over HTTP/JSON.
 
