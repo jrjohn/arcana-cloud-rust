@@ -2,7 +2,7 @@
 
 <!-- agent-managed badges START -->
 [![Quality Gate](https://img.shields.io/badge/Quality_Gate-OK-brightgreen)](https://arcana.boo/sonarqube/dashboard?id=rust-app)
-[![Build](https://arcana.boo/jenkins/buildStatus/icon?job=rust-app-pipeline-mb/main)](https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/)
+[![Build](https://img.shields.io/badge/Build-building-blue)](https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/)
 
 **Rank**: Quality Gate `OK` · Build `blue` · Sonar coverage not imported (lcov export pending DinD fix)
 <!-- agent-managed badges END -->
