@@ -15,6 +15,13 @@
   <a href="https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/"><img src="https://img.shields.io/badge/Build-passing-brightgreen?style=for-the-badge" alt="Build"></a>
 </p>
 <!-- agent-managed badges END -->
+<!-- arch-rank START -->
+<p align="center">
+  <img src="https://img.shields.io/badge/arch--qube-100.0%2F100-blue?style=for-the-badge" alt="arch-qube">
+  <img src="https://img.shields.io/badge/Grade-A%2B-brightgreen?style=for-the-badge" alt="Grade">
+  <img src="https://img.shields.io/badge/Arch_Gate-PASS-brightgreen?style=for-the-badge" alt="Architecture Gate">
+</p>
+<!-- arch-rank END -->
 
 Enterprise-grade Rust microservices framework implementing Clean Architecture with dual-protocol support (REST/gRPC), WASM plugin system, and comprehensive resilience patterns. Achieves **2.1x performance improvement** with gRPC over HTTP/JSON.
 
