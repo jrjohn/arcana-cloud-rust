@@ -38,9 +38,13 @@ pipeline {
         }
 
         stage("Cleanup Old Images") {
+            // NOTE: the global `docker image prune -f` was REMOVED here — on the
+            // shared host daemon it deleted images other concurrent builds were
+            // mid-use of ("No such image" flakes). Disk hygiene is handled off-build
+            // by the 03:00 cron /data/devops/scripts/docker-cleanup.sh. We still
+            // rotate only THIS app's own build-N images (scoped, collision-free).
             steps {
                 sh '''
-                    docker image prune -f || true
                     docker images --format '{{.Repository}}:{{.Tag}}' \
                         | grep "${APP_NAME}.*build-" \
                         | sort -t- -k2 -rn \
@@ -199,8 +203,11 @@ pipeline {
             // anonymous volumes (/src, /output) that exist for the container.
             steps {
                 sh '''
-                    docker rm -f arcana-arch-qube 2>/dev/null || true
-                    docker create --name arcana-arch-qube --network devops_default \
+                    # Per-build container name so concurrent main/PR builds don't
+                    # collide on a single static "arcana-arch-qube" name.
+                    AQ="arcana-arch-qube-${BUILD_NUMBER}"
+                    docker rm -f "$AQ" 2>/dev/null || true
+                    docker create --name "$AQ" --network devops_default \
                         -v /src -v /output \
                         arcana.boo/arcana/arch-qube:latest \
                         scan /src --framework rust --no-ai --ci \
@@ -208,12 +215,12 @@ pipeline {
                     tar --exclude=./.git --exclude=./target --exclude=./.scannerwork \
                         --exclude=./coverage --exclude=./arch-qube-reports \
                         -C . -cf - . \
-                        | docker cp - arcana-arch-qube:/src || exit 1
-                    docker start -a arcana-arch-qube
+                        | docker cp - "$AQ":/src || exit 1
+                    docker start -a "$AQ"
                     AQ_RC=$?
                     mkdir -p arch-qube-reports
-                    docker cp arcana-arch-qube:/output/. arch-qube-reports/ 2>/dev/null || true
-                    docker rm -f arcana-arch-qube 2>/dev/null || true
+                    docker cp "$AQ":/output/. arch-qube-reports/ 2>/dev/null || true
+                    docker rm -f "$AQ" 2>/dev/null || true
                     exit $AQ_RC
                 '''
             }
