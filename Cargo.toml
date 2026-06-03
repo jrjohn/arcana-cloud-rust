@@ -27,7 +27,7 @@ rust-version = "1.75"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
 
 # Web framework (Axum)
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
