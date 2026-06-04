@@ -67,6 +67,13 @@ kubectl version --client --short 2>/dev/null || kubectl version --client
 echo ""
 echo "▶ [2/7] Preparing image '${CI_IMAGE}' ..."
 if [ "${SOURCE_IMAGE}" != "${CI_IMAGE}" ]; then
+    # Under host disk pressure buildkit GC can evict the local build-N tag before
+    # this stage runs. The image is pushed to the registry early (Jenkinsfile
+    # "Docker Compose Build"), so pull it back if the local copy is gone.
+    docker image inspect "${SOURCE_IMAGE}" > /dev/null 2>&1 || {
+        echo "  Local '${SOURCE_IMAGE}' missing — pulling from registry"
+        docker pull "${SOURCE_IMAGE}"
+    }
     echo "  Tagging ${SOURCE_IMAGE} → ${CI_IMAGE}"
     docker tag "${SOURCE_IMAGE}" "${CI_IMAGE}"
 else

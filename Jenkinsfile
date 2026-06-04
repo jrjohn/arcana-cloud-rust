@@ -60,6 +60,13 @@ pipeline {
             steps {
                 sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
                 sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                // Push build-N to the registry now, before the Coverage image build
+                // and the layered/K8s windows. Under host disk pressure buildkit GC
+                // evicts the local-only build-N tag mid-build, so the later
+                // `docker compose up`/kind load fail to resolve it ("not found").
+                // A registry-durable copy survives local GC and is pulled back.
+                // Mirrors arcana-cloud-springboot's early push (22c30ed).
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
 
