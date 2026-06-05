@@ -57,16 +57,16 @@ pipeline {
         }
 
         stage("Docker Compose Build") {
+            // Build under the UNIQUE build-N name so buildkit's containerd image
+            // store never re-exports a static shared tag. Exporting `:1.0.0` directly
+            // fails with `image "...:1.0.0": already exists` when a prior build's
+            // :1.0.0 lingers (Cleanup rotates only build-N) or when a concurrent
+            // PR build exports the same static name on this shared host daemon.
+            // `docker tag` then derives :1.0.0 from build-N — a metadata reassign
+            // that always overwrites cleanly. Mirrors arcana-cloud-nodejs/springboot.
             steps {
-                sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
-                sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
-                // Push build-N to the registry now, before the Coverage image build
-                // and the layered/K8s windows. Under host disk pressure buildkit GC
-                // evicts the local-only build-N tag mid-build, so the later
-                // `docker compose up`/kind load fail to resolve it ("not found").
-                // A registry-durable copy survives local GC and is pulled back.
-                // Mirrors arcana-cloud-springboot's early push (22c30ed).
-                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                sh "CI_BUILD_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} docker compose -f docker-compose.ci.yml build"
+                sh "docker tag ${IMAGE_TAG}:build-${BUILD_NUMBER} ${IMAGE_TAG}:${VERSION}"
             }
         }
 
