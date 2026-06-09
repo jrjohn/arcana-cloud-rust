@@ -67,6 +67,15 @@ pipeline {
             steps {
                 sh "CI_BUILD_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} docker compose -f docker-compose.ci.yml build"
                 sh "docker tag ${IMAGE_TAG}:build-${BUILD_NUMBER} ${IMAGE_TAG}:${VERSION}"
+                // Push build-N to the registry NOW, before the ~12min Unit-Tests +
+                // Coverage window. build-N is otherwise local-only until "Push to
+                // Registry" (which runs AFTER the integration stages), so the host
+                // disk-GC / a sibling prune can evict the local tag mid-build and the
+                // Layered gRPC `docker compose up` (and kind-smoke pull-fallback) then
+                // die with `failed to resolve reference ...:build-N: not found`. An
+                // early registry copy makes those consumers auto-pull instead. Verified
+                // green on PR-15 #5; mirrors arcana-cloud-nodejs/springboot early-push.
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
 
