@@ -111,6 +111,15 @@ pipeline {
                     RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
                         -f deployment/layered/docker-compose-ci-grpc.yml \
                         down -v --remove-orphans 2>/dev/null || true
+                    # Reclaim the host bridge address pool before `up` creates
+                    # arcana-ci-rust-net. The default pool has only ~30 /16 slots;
+                    # closed-PR / finished-build `*_default` networks across all repos
+                    # on this shared daemon are never reclaimed by our own project's
+                    # `down`, so the pool exhausts and `up` dies with "all predefined
+                    # address pools have been fully subnetted" (build #69). prune -f
+                    # only removes container-less networks, so live builds are safe.
+                    # Mirrors the android pipeline fix for the same error.
+                    docker network prune -f >/dev/null 2>&1 || true
                     RUST_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
                     docker compose -p arcana-ci-rust-grpc \
                         -f deployment/layered/docker-compose-ci-grpc.yml up -d
