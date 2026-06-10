@@ -30,7 +30,7 @@ rust-version = "1.75"
 tokio = { version = "1.52", features = ["full"] }
 
 # Web framework (Axum)
-axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
+axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
 axum-extra = { version = "0.9", features = ["typed-header", "cookie"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "request-id"] }
