@@ -6,7 +6,6 @@
 
 use arcana_core::{ErrorResponse, FieldError};
 use axum::{
-    async_trait,
     extract::{rejection::JsonRejection, FromRequest, Request},
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -138,7 +137,6 @@ fn convert_validation_errors(errors: &ValidationErrors) -> Vec<FieldError> { // 
     field_errors
 }
 
-#[async_trait]
 impl<T, S> FromRequest<S> for ValidatedJson<T>
 where
     T: DeserializeOwned + Validate,
