@@ -27,10 +27,10 @@ const MISSING_USER_ID_MSG: &str = "Missing user ID in token";
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_users).post(create_user))
-        .route("/:id", get(get_user).put(update_user).delete(delete_user))
-        .route("/:id/role", patch(update_user_role))
-        .route("/:id/status", patch(update_user_status))
-        .route("/:id/password", put(change_password))
+        .route("/{id}", get(get_user).put(update_user).delete(delete_user))
+        .route("/{id}/role", patch(update_user_role))
+        .route("/{id}/status", patch(update_user_status))
+        .route("/{id}/password", put(change_password))
 }
 
 /// List all users (admin only).

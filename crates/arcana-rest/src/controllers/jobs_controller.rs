@@ -17,17 +17,17 @@ pub fn router() -> Router<AppState> {
     Router::new()
         // Queue operations
         .route("/queues", get(list_queues))
-        .route("/queues/:queue/stats", get(queue_stats))
-        .route("/queues/:queue/jobs", get(list_queue_jobs))
-        .route("/queues/:queue/purge", post(purge_queue))
+        .route("/queues/{queue}/stats", get(queue_stats))
+        .route("/queues/{queue}/jobs", get(list_queue_jobs))
+        .route("/queues/{queue}/purge", post(purge_queue))
         // Job operations
         .route("/jobs", get(search_jobs))
-        .route("/jobs/:job_id", get(get_job))
-        .route("/jobs/:job_id", delete(cancel_job))
-        .route("/jobs/:job_id/retry", post(retry_job))
+        .route("/jobs/{job_id}", get(get_job))
+        .route("/jobs/{job_id}", delete(cancel_job))
+        .route("/jobs/{job_id}/retry", post(retry_job))
         // DLQ operations
         .route("/dlq", get(list_dlq))
-        .route("/dlq/:job_id/retry", post(retry_dlq_job))
+        .route("/dlq/{job_id}/retry", post(retry_dlq_job))
         .route("/dlq/purge", post(purge_dlq))
         // Dashboard
         .route("/dashboard", get(dashboard_stats))
@@ -37,9 +37,9 @@ pub fn router() -> Router<AppState> {
         .route("/workers", get(list_workers))
         // Scheduled jobs
         .route("/scheduled", get(list_scheduled_jobs))
-        .route("/scheduled/:name/trigger", post(trigger_scheduled_job))
-        .route("/scheduled/:name/enable", post(enable_scheduled_job))
-        .route("/scheduled/:name/disable", post(disable_scheduled_job))
+        .route("/scheduled/{name}/trigger", post(trigger_scheduled_job))
+        .route("/scheduled/{name}/enable", post(enable_scheduled_job))
+        .route("/scheduled/{name}/disable", post(disable_scheduled_job))
 }
 
 // ============================================================================
