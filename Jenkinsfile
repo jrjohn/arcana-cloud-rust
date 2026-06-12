@@ -268,8 +268,14 @@ pipeline {
         stage("Push to Registry") {
             when { branch 'main' }
             steps {
+                // build-N was already pushed to the registry in "Docker Compose
+                // Build" (early-push, see L80) and is durable there. Re-pushing it
+                // here is redundant AND fragile: it is the only step that needs the
+                // LOCAL :build-N tag, which a concurrent build's post-success
+                // self-clean (shared IMAGE_TAG namespace) or host disk-GC can evict
+                // mid-run -> `tag does not exist`. Only the :1.0.0 release tag still
+                // needs publishing after the gates pass.
                 sh "docker push ${IMAGE_TAG}:${VERSION}"
-                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
 
