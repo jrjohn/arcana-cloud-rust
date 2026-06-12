@@ -23,7 +23,7 @@ images:
     newTag: v1.0.0
   - name: redis
     newName: redis
-    newTag: 7-alpine
+    newTag: 8-alpine
 
 patches:
   # Increase worker resources for production
