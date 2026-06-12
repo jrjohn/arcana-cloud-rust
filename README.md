@@ -3,7 +3,7 @@
 [![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-8.95%2F10-brightgreen)](https://github.com/jrjohn/arcana-cloud-rust#architecture-evaluation)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tokio](https://img.shields.io/badge/Tokio-1.52-blue)](https://tokio.rs/)
-[![Axum](https://img.shields.io/badge/Axum-0.7-blue)](https://github.com/tokio-rs/axum)
+[![Axum](https://img.shields.io/badge/Axum-0.8-blue)](https://github.com/tokio-rs/axum)
 [![Tonic](https://img.shields.io/badge/Tonic-0.12-blue)](https://github.com/hyperium/tonic)
 [![Wasmtime](https://img.shields.io/badge/Wasmtime-27-purple)](https://wasmtime.dev/)
 [![Tests](https://img.shields.io/badge/Tests-150%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
@@ -1157,8 +1157,8 @@ open tarpaulin-report.html
 | Component | Technology | Version |
 |-----------|------------|---------|
 | **Language** | Rust | 1.75+ |
-| **Async Runtime** | Tokio | 1.43 |
-| **REST Framework** | Axum | 0.7 |
+| **Async Runtime** | Tokio | 1.52 |
+| **REST Framework** | Axum | 0.8 |
 | **gRPC Framework** | Tonic | 0.12 |
 | **Database** | SQLx | 0.8 |
 | **WASM Runtime** | Wasmtime | 27 |
