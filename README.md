@@ -1162,7 +1162,7 @@ open tarpaulin-report.html
 | **gRPC Framework** | Tonic | 0.12 |
 | **Database** | SQLx | 0.8 |
 | **WASM Runtime** | Wasmtime | 27 |
-| **JWT** | jsonwebtoken | 9.3 |
+| **JWT** | jsonwebtoken | 10.0 |
 | **Password Hashing** | Argon2 | 0.5 |
 | **Rate Limiting** | Governor | 0.7 |
 | **Serialization** | Serde | 1.0 |
