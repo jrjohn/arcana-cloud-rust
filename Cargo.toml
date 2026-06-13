@@ -66,7 +66,7 @@ config = "0.15"
 dotenvy = "0.15"
 
 # Security
-jsonwebtoken = "9.3"
+jsonwebtoken = { version = "10.0", features = ["rust_crypto"] }
 argon2 = "0.5"
 uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
 
