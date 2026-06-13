@@ -118,7 +118,7 @@ mockall = "0.13"
 wiremock = "0.6"
 testcontainers = "0.23"
 tokio-test = "0.4"
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 # Internal crates
 arcana-core = { path = "crates/arcana-core" }
