@@ -6,7 +6,7 @@
 [![Axum](https://img.shields.io/badge/Axum-0.8-blue)](https://github.com/tokio-rs/axum)
 [![Tonic](https://img.shields.io/badge/Tonic-0.12-blue)](https://github.com/hyperium/tonic)
 [![Wasmtime](https://img.shields.io/badge/Wasmtime-45-purple)](https://wasmtime.dev/)
-[![Tests](https://img.shields.io/badge/Tests-150%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
+[![Tests](https://img.shields.io/badge/Tests-672%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <!-- agent-managed badges START -->
@@ -1164,7 +1164,7 @@ open tarpaulin-report.html
 | **WASM Runtime** | Wasmtime | 45 |
 | **JWT** | jsonwebtoken | 10.0 |
 | **Password Hashing** | Argon2 | 0.5 |
-| **Rate Limiting** | Governor | 0.7 |
+| **Rate Limiting** | Governor | 0.10 |
 | **Serialization** | Serde | 1.0 |
 | **Logging** | Tracing | 0.1 |
 | **Metrics** | Prometheus | 0.16 |
