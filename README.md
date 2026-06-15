@@ -1167,7 +1167,7 @@ open tarpaulin-report.html
 | **Rate Limiting** | Governor | 0.10 |
 | **Serialization** | Serde | 1.0 |
 | **Logging** | Tracing | 0.1 |
-| **Metrics** | Prometheus | 0.16 |
+| **Metrics** | Prometheus | 0.18 |
 | **Middleware** | Tower | 0.5 |
 
 ---
