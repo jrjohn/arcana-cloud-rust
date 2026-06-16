@@ -4,7 +4,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tokio](https://img.shields.io/badge/Tokio-1.52-blue)](https://tokio.rs/)
 [![Axum](https://img.shields.io/badge/Axum-0.8-blue)](https://github.com/tokio-rs/axum)
-[![Tonic](https://img.shields.io/badge/Tonic-0.12-blue)](https://github.com/hyperium/tonic)
+[![Tonic](https://img.shields.io/badge/Tonic-0.14-blue)](https://github.com/hyperium/tonic)
 [![Wasmtime](https://img.shields.io/badge/Wasmtime-45-purple)](https://wasmtime.dev/)
 [![Tests](https://img.shields.io/badge/Tests-672%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
