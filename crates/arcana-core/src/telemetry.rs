@@ -11,14 +11,21 @@ use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 #[cfg(feature = "telemetry")]
 use opentelemetry_sdk::{
-    runtime,
-    trace::{RandomIdGenerator, Sampler},
+    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
     Resource,
 };
 #[cfg(feature = "telemetry")]
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 #[cfg(feature = "telemetry")]
+use std::sync::OnceLock;
+#[cfg(feature = "telemetry")]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+/// Holds the active tracer provider so it can be flushed/shut down on exit.
+/// opentelemetry 0.32 removed `global::shutdown_tracer_provider`; shutdown is
+/// now performed on the provider instance directly.
+#[cfg(feature = "telemetry")]
+static TRACER_PROVIDER: OnceLock<SdkTracerProvider> = OnceLock::new();
 
 use crate::ArcanaResult;
 use serde::{Deserialize, Serialize};
@@ -93,9 +100,9 @@ pub fn init_telemetry(config: &TelemetryConfig) -> ArcanaResult<()> {
         Sampler::TraceIdRatioBased(config.sampling_ratio)
     };
 
-    let resource = Resource::new(vec![
-        KeyValue::new(SERVICE_NAME, config.service_name.clone()),
-    ]);
+    let resource = Resource::builder()
+        .with_attribute(KeyValue::new(SERVICE_NAME, config.service_name.clone()))
+        .build();
 
     // Build the tracer provider
     let tracer_provider = if let Some(endpoint) = &config.otlp_endpoint {
@@ -105,15 +112,15 @@ pub fn init_telemetry(config: &TelemetryConfig) -> ArcanaResult<()> {
             .build()
             .map_err(|e| crate::ArcanaError::Internal(format!("Failed to create OTLP exporter: {}", e)))?;
 
-        opentelemetry_sdk::trace::TracerProvider::builder()
-            .with_batch_exporter(exporter, runtime::Tokio)
+        SdkTracerProvider::builder()
+            .with_batch_exporter(exporter)
             .with_sampler(sampler)
             .with_id_generator(RandomIdGenerator::default())
             .with_resource(resource)
             .build()
     } else {
         // No OTLP endpoint, just create a basic provider
-        opentelemetry_sdk::trace::TracerProvider::builder()
+        SdkTracerProvider::builder()
             .with_sampler(sampler)
             .with_id_generator(RandomIdGenerator::default())
             .with_resource(resource)
@@ -122,8 +129,9 @@ pub fn init_telemetry(config: &TelemetryConfig) -> ArcanaResult<()> {
 
     let tracer = tracer_provider.tracer("arcana-cloud-rust");
 
-    // Set global provider
-    opentelemetry::global::set_tracer_provider(tracer_provider);
+    // Set global provider and keep a handle for shutdown.
+    opentelemetry::global::set_tracer_provider(tracer_provider.clone());
+    let _ = TRACER_PROVIDER.set(tracer_provider);
 
     // Build the subscriber with OpenTelemetry layer
     let filter = EnvFilter::try_from_default_env()
@@ -173,7 +181,11 @@ fn init_basic_tracing(console_output: bool) -> ArcanaResult<()> {
 /// Shutdown telemetry, flushing any pending spans.
 #[cfg(feature = "telemetry")]
 pub fn shutdown_telemetry() {
-    opentelemetry::global::shutdown_tracer_provider();
+    if let Some(provider) = TRACER_PROVIDER.get() {
+        if let Err(e) = provider.shutdown() {
+            tracing::warn!(error = %e, "Error during telemetry shutdown");
+        }
+    }
     tracing::info!("Telemetry shutdown complete");
 }
 
