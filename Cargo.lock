@@ -161,7 +161,7 @@ dependencies = [
  "arcana-service",
  "async-trait",
  "chrono",
- "prost 0.13.5",
+ "prost 0.14.4",
  "prost-types 0.13.5",
  "reqwest 0.12.28",
  "serde",
