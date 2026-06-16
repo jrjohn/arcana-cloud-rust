@@ -41,7 +41,7 @@ hyper-util = { version = "0.1" }
 tonic = { version = "0.12", features = ["tls", "tls-roots"] }
 tonic-build = "0.12"
 prost = "0.13"
-prost-types = "0.13"
+prost-types = "0.14"
 
 # Database (SQLx)
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "mysql", "sqlite", "uuid", "chrono", "json"] }
