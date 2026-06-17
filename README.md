@@ -1160,7 +1160,7 @@ open tarpaulin-report.html
 | **Async Runtime** | Tokio | 1.52 |
 | **REST Framework** | Axum | 0.8 |
 | **gRPC Framework** | Tonic | 0.14 |
-| **Database** | SQLx | 0.8 |
+| **Database** | SQLx | 0.9 |
 | **WASM Runtime** | Wasmtime | 45 |
 | **JWT** | jsonwebtoken | 10.0 |
 | **Password Hashing** | Argon2 | 0.5 |
