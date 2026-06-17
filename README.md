@@ -1159,7 +1159,7 @@ open tarpaulin-report.html
 | **Language** | Rust | 1.75+ |
 | **Async Runtime** | Tokio | 1.52 |
 | **REST Framework** | Axum | 0.8 |
-| **gRPC Framework** | Tonic | 0.12 |
+| **gRPC Framework** | Tonic | 0.14 |
 | **Database** | SQLx | 0.8 |
 | **WASM Runtime** | Wasmtime | 45 |
 | **JWT** | jsonwebtoken | 10.0 |
