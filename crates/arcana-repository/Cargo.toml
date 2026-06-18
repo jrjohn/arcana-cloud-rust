@@ -22,4 +22,4 @@ shaku.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 testcontainers = { workspace = true }
-testcontainers-modules = { version = "0.11", features = ["mysql"] }
+testcontainers-modules = { version = "0.15", features = ["mysql"] }
