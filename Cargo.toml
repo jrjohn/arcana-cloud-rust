@@ -110,7 +110,7 @@ async-trait = "0.1"
 
 # Dependency Injection
 shaku = { version = "0.6", features = ["derive", "thread_safe"] }
-shaku_axum = "0.3"
+shaku_axum = "0.6"
 
 # Futures
 futures = "0.3"
