@@ -99,7 +99,7 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 # Validation
-validator = { version = "0.19", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
 
 # OpenAPI Documentation
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
