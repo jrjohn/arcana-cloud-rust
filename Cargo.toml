@@ -73,7 +73,7 @@ argon2 = "0.5"
 uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
 
 # WASM Plugin Runtime
-wasmtime = { version = "45", features = ["component-model"] }
+wasmtime = { version = "46", features = ["component-model"] }
 wasmtime-wasi = "45"
 
 # Resilience
