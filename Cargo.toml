@@ -116,7 +116,7 @@ shaku_axum = "0.6"
 futures = "0.3"
 
 # Testing
-mockall = "0.14"
+mockall = "0.15"
 wiremock = "0.6"
 testcontainers = "0.27"
 tokio-test = "0.4"
