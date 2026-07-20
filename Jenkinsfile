@@ -91,21 +91,41 @@ pipeline {
         }
 
         stage("Coverage (llvm-cov)") {
+            // Blocking: a failing/missing cargo-llvm-cov run now fails the build.
+            // DinD-safe: this Jenkins talks to the HOST daemon, so
+            // docker-compose.coverage.yml's `- .:/app` bind mount resolved to a
+            // stray host path (empty /app) — cargo-llvm-cov silently produced no
+            // report, and the catchError + `|| true` swallowed that as green.
+            // Instead build the toolchain image, then copy source IN via a tar
+            // stream and the lcov report OUT with docker cp (same pattern as the
+            // Architecture Qube stage below).
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh "mkdir -p coverage"
-                    sh "docker compose -f docker-compose.coverage.yml build coverage || true"
-                    sh "docker compose -f docker-compose.coverage.yml run --rm coverage || true"
-                    sh '''
-                        if [ -f coverage/lcov.info ]; then
-                            sed -i "s|SF:/app/|SF:$(pwd)/|g" coverage/lcov.info
-                            echo "Fixed LCOV paths: $(head -2 coverage/lcov.info)"
-                            echo "Total SF entries: $(grep -c '^SF:' coverage/lcov.info)"
-                        else
-                            echo "WARNING: coverage/lcov.info not found"
-                        fi
-                    '''
-                }
+                sh "docker compose -f docker-compose.coverage.yml build coverage"
+                sh '''
+                    set -e
+                    COV="arcana-rust-coverage-${BUILD_NUMBER}"
+                    docker rm -f "$COV" 2>/dev/null || true
+                    docker create --name "$COV" -v /app -w /app \
+                        localhost:5000/arcana/rust-coverage:latest \
+                        sh scripts/run-coverage.sh
+                    tar --exclude=./.git --exclude=./target --exclude=./coverage \
+                        --exclude=./arch-qube-reports --exclude=./.scannerwork \
+                        -C . -cf - . \
+                        | docker cp - "$COV":/app
+                    docker start -a "$COV"
+                    COV_RC=$?
+                    mkdir -p coverage
+                    docker cp "$COV":/app/coverage/. coverage/ 2>/dev/null || true
+                    docker rm -f "$COV" 2>/dev/null || true
+                    if [ -f coverage/lcov.info ]; then
+                        sed -i "s|SF:/app/|SF:$(pwd)/|g" coverage/lcov.info
+                        echo "Fixed LCOV paths: $(head -2 coverage/lcov.info)"
+                        echo "Total SF entries: $(grep -c '^SF:' coverage/lcov.info)"
+                    else
+                        echo "coverage/lcov.info not found"
+                    fi
+                    exit $COV_RC
+                '''
             }
         }
 
