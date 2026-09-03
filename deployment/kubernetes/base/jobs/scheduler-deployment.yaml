@@ -1,3 +1,12 @@
+# Cron scheduler.
+#
+# Role selection is the ARCANA_DEPLOYMENT__LAYER env var -- the binary parses
+# no command-line flags, so `args` here would be silently ignored.
+#
+# Sizing: exactly one replica does work at a time; leadership is held in Redis
+# (jobs.scheduler.leader_ttl_secs), not through the Kubernetes lease API. The
+# second replica is a warm standby, so this must NEVER have an HPA -- extra
+# replicas add standby cost and no throughput.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,7 +16,7 @@ metadata:
     component: job-scheduler
     tier: scheduler
 spec:
-  # Only one scheduler should be active (leader election handles this)
+  # One leader + one standby.
   replicas: 2
   selector:
     matchLabels:
@@ -21,36 +30,36 @@ spec:
         tier: scheduler
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/port: "8080"
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: arcana-scheduler
+      terminationGracePeriodSeconds: 30
       containers:
         - name: scheduler
           image: arcana-server:latest
           imagePullPolicy: IfNotPresent
-          command: ["./arcana-server"]
-          args: ["--mode", "scheduler"]
           ports:
-            - name: metrics
-              containerPort: 9090
+            # One port serves /health, /live, /ready and /metrics.
+            - name: http
+              containerPort: 8080
               protocol: TCP
-            - name: health
-              containerPort: 8081
-              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: arcana-jobs-env
           env:
-            - name: RUST_LOG
-              value: "info,arcana=debug"
-            - name: APP__MODE
+            - name: ARCANA_DEPLOYMENT__LAYER
               value: "scheduler"
-            - name: APP__JOBS__REDIS__URL
+            - name: ARCANA_JOBS__ENABLED
+              value: "true"
+            - name: ARCANA_JOBS__REDIS__URL
               valueFrom:
                 secretKeyRef:
-                  name: arcana-secrets
+                  name: arcana-jobs-secrets
                   key: redis-url
-            - name: APP__JOBS__SCHEDULER__LEADER_TTL_SECS
+            - name: ARCANA_JOBS__SCHEDULER__LEADER_TTL_SECS
               value: "30"
-            - name: APP__JOBS__SCHEDULER__CHECK_INTERVAL_SECS
+            - name: ARCANA_JOBS__SCHEDULER__CHECK_INTERVAL_SECS
               value: "60"
             - name: POD_NAME
               valueFrom:
@@ -69,16 +78,16 @@ spec:
               cpu: "200m"
           livenessProbe:
             httpGet:
-              path: /health
-              port: health
+              path: /live
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health/ready
-              port: health
+              path: /ready
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
@@ -112,8 +121,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 9090
-      targetPort: metrics
+    # Named "metrics" because the ServiceMonitor selects the port by name.
+    - port: 8080
+      targetPort: http
       protocol: TCP
       name: metrics
   selector:
@@ -127,31 +137,6 @@ metadata:
   labels:
     app: arcana
     component: job-scheduler
----
-# RBAC for leader election (optional, if using Kubernetes leader election)
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: arcana-scheduler-leader-election
-  labels:
-    app: arcana
-    component: job-scheduler
-rules:
-  - apiGroups: ["coordination.k8s.io"]
-    resources: ["leases"]
-    verbs: ["get", "create", "update"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: arcana-scheduler-leader-election
-  labels:
-    app: arcana
-    component: job-scheduler
-subjects:
-  - kind: ServiceAccount
-    name: arcana-scheduler
-roleRef:
-  kind: Role
-  name: arcana-scheduler-leader-election
-  apiGroup: rbac.authorization.k8s.io
+# No Role/RoleBinding: leadership is held on a Redis key, so the scheduler
+# needs no Kubernetes API access. Granting lease permissions it never uses
+# would only widen the blast radius of a compromised pod.

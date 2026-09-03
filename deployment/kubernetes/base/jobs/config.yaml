@@ -1,46 +1,9 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: arcana-jobs-config
-  labels:
-    app: arcana
-    component: jobs
-data:
-  jobs.toml: |
-    [redis]
-    pool_size = 10
-    connect_timeout_secs = 5
-    key_prefix = "arcana:jobs"
-
-    [worker]
-    concurrency = 4
-    job_timeout_secs = 300
-    poll_interval_ms = 100
-    shutdown_timeout_secs = 30
-    heartbeat_interval_secs = 30
-
-    [queue]
-    max_size = 0  # Unlimited
-    retention_secs = 604800  # 7 days
-
-    [queue.default_retry]
-    max_retries = 3
-    initial_delay_ms = 1000
-    max_delay_ms = 3600000
-    multiplier = 2.0
-
-    [queue.dlq]
-    enabled = true
-    max_size = 10000
-    retention_secs = 2592000  # 30 days
-
-    [scheduler]
-    enabled = true
-    check_interval_secs = 60
-    poll_interval_secs = 10
-    leader_ttl_secs = 30
-    leader_check_interval_secs = 15
----
+# Shared resources for the job roles.
+#
+# There is deliberately no `jobs.toml` ConfigMap here: the binary loads
+# config/{default,<environment>}.toml from the image and applies ARCANA_
+# environment overrides on top. A separately-shaped file would be a second
+# configuration format that nothing reads.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -67,7 +30,7 @@ spec:
       app: arcana
   namespaceSelector:
     matchNames:
-      - default
+      - arcana
   endpoints:
     - port: metrics
       interval: 15s
@@ -163,6 +126,42 @@ spec:
       app: arcana
       component: job-worker
 ---
+# PodDisruptionBudget for the scheduler.
+#
+# Without this a node drain can evict both replicas at once, which leaves no
+# leader and silently stops every cron job until a pod reschedules.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcana-job-scheduler-pdb
+  labels:
+    app: arcana
+    component: job-scheduler
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: arcana
+      component: job-scheduler
+---
+# PodDisruptionBudget for the job queue Redis.
+#
+# Redis is the queue itself: evicting it drops every worker and scheduler into
+# a reconnect loop, so it must not be taken down as collateral of a drain.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcana-jobs-redis-pdb
+  labels:
+    app: arcana
+    component: jobs-redis
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: arcana
+      component: jobs-redis
+---
 # NetworkPolicy for job components
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -179,18 +178,18 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow metrics scraping from Prometheus
+    # Metrics scraping and health probes share one port on the job roles.
     - from:
         - namespaceSelector:
             matchLabels:
               name: monitoring
       ports:
         - protocol: TCP
-          port: 9090
-    # Allow health checks
+          port: 8080
+    # Kubelet probes originate outside the cluster pod network.
     - ports:
         - protocol: TCP
-          port: 8081
+          port: 8080
   egress:
     # Allow Redis access
     - to:

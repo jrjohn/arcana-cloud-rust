@@ -71,6 +71,10 @@ pub enum DeploymentLayer {
     Service,
     /// Repository/Infrastructure layer only.
     Repository,
+    /// Background job worker only (no inbound API surface).
+    Worker,
+    /// Cron scheduler only (leader-elected, exactly one active instance).
+    Scheduler,
 }
 
 impl DeploymentLayer {
@@ -91,6 +95,25 @@ impl DeploymentLayer {
     pub const fn has_repository(&self) -> bool {
         matches!(self, Self::All | Self::Repository)
     }
+
+    /// Returns true if this layer is a background job role.
+    ///
+    /// Job roles never serve the public API and never open a database pool,
+    /// so they are dispatched before the deployment-mode branch.
+    #[must_use]
+    pub const fn is_job_role(&self) -> bool {
+        matches!(self, Self::Worker | Self::Scheduler)
+    }
+
+    /// Returns true if this layer may be scaled horizontally on demand.
+    ///
+    /// `Repository` holds the only database pool, so replica count multiplies
+    /// database connections; `Scheduler` elects a single leader, so extra
+    /// replicas are standby only. Neither should be attached to an HPA.
+    #[must_use]
+    pub const fn is_horizontally_scalable(&self) -> bool {
+        matches!(self, Self::Controller | Self::Service | Self::Worker)
+    }
 }
 
 impl fmt::Display for DeploymentLayer {
@@ -100,6 +123,8 @@ impl fmt::Display for DeploymentLayer {
             Self::Controller => write!(f, "controller"),
             Self::Service => write!(f, "service"),
             Self::Repository => write!(f, "repository"),
+            Self::Worker => write!(f, "worker"),
+            Self::Scheduler => write!(f, "scheduler"),
         }
     }
 }
@@ -257,6 +282,61 @@ mod tests {
         assert_eq!(DeploymentLayer::Controller.to_string(), "controller");
         assert_eq!(DeploymentLayer::Service.to_string(), "service");
         assert_eq!(DeploymentLayer::Repository.to_string(), "repository");
+        assert_eq!(DeploymentLayer::Worker.to_string(), "worker");
+        assert_eq!(DeploymentLayer::Scheduler.to_string(), "scheduler");
+    }
+
+    #[test]
+    fn test_job_roles_carry_no_api_layer() {
+        // A worker/scheduler pod must not serve the API or open a DB pool.
+        for layer in [DeploymentLayer::Worker, DeploymentLayer::Scheduler] {
+            assert!(layer.is_job_role(), "{layer} should be a job role");
+            assert!(!layer.has_controller(), "{layer} must not serve REST");
+            assert!(!layer.has_service(), "{layer} must not host services");
+            assert!(!layer.has_repository(), "{layer} must not open a DB pool");
+        }
+    }
+
+    #[test]
+    fn test_api_layers_are_not_job_roles() {
+        for layer in [
+            DeploymentLayer::All,
+            DeploymentLayer::Controller,
+            DeploymentLayer::Service,
+            DeploymentLayer::Repository,
+        ] {
+            assert!(!layer.is_job_role(), "{layer} should not be a job role");
+        }
+    }
+
+    #[test]
+    fn test_only_stateless_roles_are_horizontally_scalable() {
+        // Repository owns the only DB pool; Scheduler elects a single leader.
+        assert!(DeploymentLayer::Controller.is_horizontally_scalable());
+        assert!(DeploymentLayer::Service.is_horizontally_scalable());
+        assert!(DeploymentLayer::Worker.is_horizontally_scalable());
+        assert!(!DeploymentLayer::Repository.is_horizontally_scalable());
+        assert!(!DeploymentLayer::Scheduler.is_horizontally_scalable());
+        assert!(!DeploymentLayer::All.is_horizontally_scalable());
+    }
+
+    #[test]
+    fn test_deployment_layer_env_value_deserialization() {
+        // These are exactly the strings the Kubernetes manifests set in
+        // ARCANA_DEPLOYMENT__LAYER; a rename here silently breaks the pods.
+        let cases = [
+            ("all", DeploymentLayer::All),
+            ("controller", DeploymentLayer::Controller),
+            ("service", DeploymentLayer::Service),
+            ("repository", DeploymentLayer::Repository),
+            ("worker", DeploymentLayer::Worker),
+            ("scheduler", DeploymentLayer::Scheduler),
+        ];
+        for (raw, expected) in cases {
+            let parsed: DeploymentLayer =
+                serde_json::from_str(&format!("\"{raw}\"")).unwrap();
+            assert_eq!(parsed, expected, "failed to parse {raw}");
+        }
     }
 
     #[test]
@@ -266,6 +346,8 @@ mod tests {
             DeploymentLayer::Controller,
             DeploymentLayer::Service,
             DeploymentLayer::Repository,
+            DeploymentLayer::Worker,
+            DeploymentLayer::Scheduler,
         ];
         for layer in &layers {
             let json = serde_json::to_string(layer).unwrap();

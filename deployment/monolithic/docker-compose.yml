@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   arcana-server:
     build:
@@ -13,9 +11,22 @@ services:
       - RUST_LOG=info,arcana=debug
       - ARCANA_ENVIRONMENT=production
       - ARCANA_DEPLOYMENT_MODE=monolithic
-      - ARCANA__DATABASE__URL=mysql://arcana:arcana@mysql:3306/arcana
-      - ARCANA__REDIS__URL=redis://redis:6379
-      - ARCANA__SECURITY__JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - ARCANA_DEPLOYMENT__MODE=monolithic
+      - ARCANA_DEPLOYMENT__LAYER=all
+      # One underscore after the ARCANA prefix, two between config levels.
+      # `ARCANA__DATABASE__URL` parses as the key "_database.url", which
+      # nothing reads -- the server then silently fell back to the localhost
+      # Postgres URL in config/default.toml.
+      - ARCANA_DATABASE__URL=mysql://arcana:arcana@mysql:3306/arcana
+      - ARCANA_REDIS__URL=redis://redis:6379
+      - ARCANA_SECURITY__JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      # Local stack, no certificate pair mounted; production.toml enables gRPC
+      # TLS and the process refuses to start without one.
+      - ARCANA_SECURITY__GRPC_TLS_ENABLED=false
+      # A monolithic container is meant to be the whole system, so it also
+      # hosts the worker and scheduler in-process.
+      - ARCANA_JOBS__ENABLED=true
+      - ARCANA_JOBS__REDIS__URL=redis://redis:6379
     depends_on:
       mysql:
         condition: service_healthy
@@ -44,7 +55,10 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
     ports:
       - "3306:3306"
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    # `--default-authentication-plugin` was removed in MySQL 9; passing it makes
+    # the server abort during initialisation ("unknown variable"). The default
+    # auth plugin (caching_sha2_password) is what sqlx negotiates anyway.
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "arcana", "-parcana"]
       interval: 10s

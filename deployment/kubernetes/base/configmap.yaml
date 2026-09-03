@@ -1,0 +1,61 @@
+# Arcana Cloud Rust - Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arcana-config
+  namespace: arcana
+  labels:
+    app.kubernetes.io/name: arcana-cloud
+    app.kubernetes.io/part-of: arcana
+data:
+  # Application settings
+  RUST_LOG: "info,arcana=debug"
+  ARCANA_APP__ENVIRONMENT: "production"
+  ARCANA_ENVIRONMENT: "production"
+  # Selects which extra file the loader reads: config/layeredgrpc.toml.
+  # Single underscore, no nesting -- this one is read directly by the loader,
+  # not through the config-override mechanism below.
+  ARCANA_DEPLOYMENT_MODE: "layeredgrpc"
+  # The mode the process actually runs in. This deployment splits the layers
+  # across pods, so it must NOT say "monolithic": monolithic dispatches on the
+  # mode alone and runs a full in-process stack in every pod, ignoring
+  # ARCANA_DEPLOYMENT__LAYER entirely.
+  ARCANA_DEPLOYMENT__MODE: "kubernetesgrpc"
+  # No ARCANA_DEPLOYMENT__LAYER here on purpose: each Deployment sets its own,
+  # and a shared default would be one more place for the two to disagree.
+
+  # Server settings.
+  #
+  # `__` separates config *levels*, not words: the fields are server.rest_host
+  # and server.rest_port, so `ARCANA_SERVER__REST_HOST` addresses a
+  # server.rest.host that does not exist and is silently discarded.
+  ARCANA_SERVER__REST_HOST: "0.0.0.0"
+  ARCANA_SERVER__REST_PORT: "8080"
+  ARCANA_SERVER__GRPC_HOST: "0.0.0.0"
+  ARCANA_SERVER__GRPC_PORT: "9090"
+  ARCANA_SERVER__REQUEST_TIMEOUT_SECS: "30"
+
+  # Security settings (non-sensitive)
+  # TLS terminates at the Ingress; no key pair is mounted into the pods, and
+  # config/production.toml enables gRPC TLS, which would otherwise stop every
+  # pod from starting. Mount a pair and drop this line to get in-mesh mTLS.
+  ARCANA_SECURITY__GRPC_TLS_ENABLED: "false"
+  ARCANA_SECURITY__JWT_ISSUER: "arcana-cloud"
+  ARCANA_SECURITY__JWT_AUDIENCE: "arcana-api"
+  ARCANA_SECURITY__JWT_ACCESS_EXPIRATION_SECS: "3600"
+  ARCANA_SECURITY__JWT_REFRESH_EXPIRATION_SECS: "604800"
+  ARCANA_SECURITY__PASSWORD_HASH_COST: "12"
+
+  # Database settings (non-sensitive)
+  ARCANA_DATABASE__MIN_CONNECTIONS: "5"
+  ARCANA_DATABASE__MAX_CONNECTIONS: "20"
+  ARCANA_DATABASE__CONNECT_TIMEOUT_SECS: "30"
+  ARCANA_DATABASE__IDLE_TIMEOUT_SECS: "600"
+  ARCANA_DATABASE__LOG_QUERIES: "false"
+
+  # Observability
+  ARCANA_OBSERVABILITY__LOG_LEVEL: "info"
+  ARCANA_OBSERVABILITY__LOG_FORMAT: "json"
+  ARCANA_OBSERVABILITY__METRICS_ENABLED: "true"
+  ARCANA_OBSERVABILITY__METRICS_PATH: "/metrics"
+  ARCANA_OBSERVABILITY__TRACING_ENABLED: "true"

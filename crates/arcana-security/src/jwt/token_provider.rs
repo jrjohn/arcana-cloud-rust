@@ -249,13 +249,11 @@ impl TokenProvider {
 
     /// Decodes a token without validation (for inspection).
     pub fn decode_without_validation(&self, token: &str) -> ArcanaResult<Claims> {
-        let mut validation = Validation::new(Algorithm::HS256);
-        validation.insecure_disable_signature_validation();
-        validation.validate_exp = false;
-        validation.validate_nbf = false;
-        validation.validate_aud = false;
-
-        let token_data = decode::<Claims>(token, &self.decoding_key, &validation)
+        // jsonwebtoken 11 removed `Validation::insecure_disable_signature_validation`
+        // in favour of an explicitly named entry point. This decodes the claims
+        // for inspection only -- the signature is NOT checked, so the result
+        // must never be used to authorise anything.
+        let token_data = jsonwebtoken::dangerous::insecure_decode::<Claims>(token)
             .map_err(|e| ArcanaError::InvalidToken(e.to_string()))?;
 
         Ok(token_data.claims)
@@ -350,13 +348,11 @@ impl TokenProviderInterface for TokenProvider {
     }
 
     fn decode_without_validation(&self, token: &str) -> ArcanaResult<Claims> {
-        let mut validation = Validation::new(Algorithm::HS256);
-        validation.insecure_disable_signature_validation();
-        validation.validate_exp = false;
-        validation.validate_nbf = false;
-        validation.validate_aud = false;
-
-        let token_data = decode::<Claims>(token, &self.decoding_key, &validation)
+        // jsonwebtoken 11 removed `Validation::insecure_disable_signature_validation`
+        // in favour of an explicitly named entry point. This decodes the claims
+        // for inspection only -- the signature is NOT checked, so the result
+        // must never be used to authorise anything.
+        let token_data = jsonwebtoken::dangerous::insecure_decode::<Claims>(token)
             .map_err(|e| ArcanaError::InvalidToken(e.to_string()))?;
 
         Ok(token_data.claims)

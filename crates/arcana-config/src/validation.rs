@@ -38,6 +38,8 @@ pub enum ConfigValidationError {
     MissingServiceUrl,
     /// Repository URL required for layered deployment.
     MissingRepositoryUrl,
+    /// A single layer was selected but the mode runs every layer in-process.
+    LayerIgnoredByMonolithicMode { layer: String },
 }
 
 impl fmt::Display for ConfigValidationError {
@@ -113,6 +115,14 @@ impl fmt::Display for ConfigValidationError {
             Self::MissingRepositoryUrl => {
                 write!(f, "Repository URL required for service layer in layered deployment")
             }
+            Self::LayerIgnoredByMonolithicMode { layer } => {
+                write!(
+                    f,
+                    "deployment.layer is '{layer}' but deployment.mode is 'monolithic', \
+                     which runs every layer in one process and ignores the layer -- \
+                     set mode to layeredgrpc/kubernetesgrpc, or layer to 'all'"
+                )
+            }
         }
     }
 }
@@ -177,14 +187,21 @@ impl ConfigValidator {
     pub fn validate(config: &AppConfig) -> Result<(), Vec<ConfigValidationError>> {
         let mut result = ValidationResult::new();
 
-        Self::validate_security(&config.security, &mut result);
         Self::validate_server(&config.server, &mut result);
-        Self::validate_database(&config.database, &mut result);
         Self::validate_redis(&config.redis, &mut result);
         Self::validate_observability(&config.observability, &mut result);
         Self::validate_deployment(&config.deployment, &mut result);
         Self::validate_ssr(&config.ssr, &mut result);
         Self::validate_plugins(&config.plugins, &mut result);
+
+        // Background job roles issue no tokens and open no database pool.
+        // Demanding a JWT secret and a database URL from them would force a
+        // deployment to hand a worker credentials it has no use for, purely to
+        // satisfy a check -- so these apply only to roles that use them.
+        if !config.deployment.layer.is_job_role() {
+            Self::validate_security(&config.security, &mut result);
+            Self::validate_database(&config.database, &mut result);
+        }
 
         result.into_result()
     }
@@ -369,7 +386,29 @@ impl ConfigValidator {
 
     /// Validates deployment configuration.
     fn validate_deployment(config: &crate::DeploymentConfig, result: &mut ValidationResult) {
-        if !config.mode.is_layered() {
+        // Job roles are mode-independent: they never take part in the layer
+        // chain, so neither check below applies to them.
+        if config.layer.is_job_role() {
+            return;
+        }
+
+        if config.mode.is_monolithic() {
+            // Monolithic dispatches on mode alone. Asking for a single layer
+            // here does not produce that layer -- it silently produces a full
+            // in-process stack, which is how a "layered" cluster ends up
+            // running five copies of everything.
+            if config.layer != crate::DeploymentLayer::All {
+                result.add_error(ConfigValidationError::LayerIgnoredByMonolithicMode {
+                    layer: config.layer.to_string(),
+                });
+            }
+            return;
+        }
+
+        // Kubernetes modes are layered deployments too; `is_layered()` alone
+        // covers only the Compose variants and would skip these checks in the
+        // one environment where a missing upstream URL is hardest to spot.
+        if !config.mode.is_layered() && !config.mode.is_kubernetes() {
             return;
         }
 
@@ -450,6 +489,7 @@ pub fn format_validation_errors(errors: &[ConfigValidationError]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::DeploymentLayer;
 
     fn valid_config() -> AppConfig {
         let mut config = AppConfig::default();
@@ -506,6 +546,94 @@ mod tests {
             e,
             ConfigValidationError::PortConflict { .. }
         )));
+    }
+
+    #[test]
+    fn test_monolithic_mode_rejects_a_single_layer() {
+        // The combination is not a smaller deployment -- it is a full stack
+        // wearing the wrong label, and nothing else in the system says so.
+        let mut config = valid_config();
+        config.deployment.mode = crate::DeploymentMode::Monolithic;
+
+        for layer in [
+            DeploymentLayer::Controller,
+            DeploymentLayer::Service,
+            DeploymentLayer::Repository,
+        ] {
+            config.deployment.layer = layer;
+            assert!(
+                ConfigValidator::validate(&config).is_err(),
+                "monolithic + {layer} must be rejected"
+            );
+        }
+
+        config.deployment.layer = DeploymentLayer::All;
+        assert!(ConfigValidator::validate(&config).is_ok());
+    }
+
+    #[test]
+    fn test_monolithic_mode_still_allows_job_roles() {
+        // A worker pod is mode-independent; it is not a layer in the chain.
+        let mut config = valid_config();
+        config.deployment.mode = crate::DeploymentMode::Monolithic;
+        for layer in [DeploymentLayer::Worker, DeploymentLayer::Scheduler] {
+            config.deployment.layer = layer;
+            assert!(
+                ConfigValidator::validate(&config).is_ok(),
+                "monolithic + {layer} should be allowed"
+            );
+        }
+    }
+
+    #[test]
+    fn test_kubernetes_mode_requires_upstream_urls() {
+        // Same requirement as the Compose modes: a controller with no service
+        // URL cannot serve a single request.
+        let mut config = valid_config();
+        config.deployment.mode = crate::DeploymentMode::KubernetesGrpc;
+        config.deployment.layer = DeploymentLayer::Controller;
+        config.deployment.service_url = None;
+        assert!(ConfigValidator::validate(&config).is_err());
+
+        config.deployment.service_url = Some("http://arcana-service:9090".to_string());
+        assert!(ConfigValidator::validate(&config).is_ok());
+    }
+
+    #[test]
+    fn test_job_roles_need_no_jwt_secret_or_database() {
+        // A worker pod mounts neither secret; requiring them would only mean
+        // granting credentials that the role never uses.
+        let mut config = AppConfig::default();
+        config.security.jwt_secret = "too-short".to_string();
+        config.database.url = String::new();
+
+        for layer in [DeploymentLayer::Worker, DeploymentLayer::Scheduler] {
+            config.deployment.layer = layer;
+            assert!(
+                ConfigValidator::validate(&config).is_ok(),
+                "{layer} should validate without JWT/database settings"
+            );
+        }
+    }
+
+    #[test]
+    fn test_api_roles_still_require_a_jwt_secret() {
+        // The same relaxation must not leak into a role that signs tokens.
+        let mut config = AppConfig::default();
+        config.security.jwt_secret = "too-short".to_string();
+
+        for layer in [
+            DeploymentLayer::All,
+            DeploymentLayer::Controller,
+            DeploymentLayer::Service,
+            DeploymentLayer::Repository,
+        ] {
+            config.deployment.layer = layer;
+            assert!(
+                ConfigValidator::validate(&config).is_err(),
+                "{layer} must still reject a short JWT secret"
+            );
+        }
     }
 
     #[test]

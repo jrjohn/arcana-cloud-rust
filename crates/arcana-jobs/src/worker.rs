@@ -55,7 +55,7 @@ impl From<&WorkerConfig> for WorkerPoolConfig {
     fn from(config: &WorkerConfig) -> Self {
         Self {
             concurrency: config.concurrency,
-            queues: vec!["default".to_string()],
+            queues: config.queues.clone(),
             job_timeout: config.job_timeout(),
             poll_interval: config.poll_interval(),
             shutdown_timeout: config.shutdown_timeout(),
@@ -372,6 +372,15 @@ pub struct WorkerPoolStats {
 }
 
 impl<Q: JobQueue + 'static> WorkerPool<Q> {
+    /// Number of registered job handlers.
+    ///
+    /// A pool with zero handlers fails every job it dequeues, so callers
+    /// (deployment roles) check this at startup rather than discovering it
+    /// one dead-lettered job at a time.
+    pub fn handler_count(&self) -> usize {
+        self.handlers.read().len()
+    }
+
     /// Get pool statistics.
     pub fn stats(&self) -> WorkerPoolStats {
         WorkerPoolStats {
@@ -383,6 +392,19 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
             queues: self.config.queues.clone(),
         }
     }
+}
+
+
+/// Compile-time guard: `WorkerPool::start` must stay `Send`.
+///
+/// A `parking_lot` guard held across an `.await` silently makes this future
+/// `!Send`, which means it can no longer be spawned as a task -- the failure
+/// shows up as a build error in the caller, far from the cause. This function
+/// is never called; it exists so the regression fails here instead.
+#[allow(dead_code)]
+fn assert_worker_pool_start_future_is_send<Q: JobQueue + Send + Sync + 'static>(inner: &WorkerPool<Q>) {
+    fn is_send<T: Send>(_: &T) {}
+    is_send(&inner.start());
 }
 
 #[cfg(test)]

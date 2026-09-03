@@ -12,6 +12,12 @@
 #   - Controller exposes REST API (port 8080) and calls Service layer via gRPC
 #   - Service exposes gRPC (port 9090) and calls Repository layer via gRPC
 #   - Repository exposes gRPC (port 9090) and connects to MySQL database
+#
+# Two further roles run beside that chain rather than inside it:
+#   - worker    drains the job queues (scales out; add replicas freely)
+#   - scheduler fires cron entries (leader-elected; exactly one active)
+# Both are the same binary selected by ARCANA_DEPLOYMENT__LAYER, matching the
+# Kubernetes deployment one-to-one.
 
 services:
   # MySQL Database
@@ -36,6 +42,22 @@ services:
     networks:
       - arcana-network
 
+  # Redis - job queue backing store, shared by worker and scheduler
+  redis:
+    image: redis:8-alpine
+    container_name: arcana-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - arcana-network
+
   # Repository Layer - Database access via gRPC
   repository:
     build:
@@ -50,6 +72,8 @@ services:
     environment:
       RUST_LOG: info,arcana=debug
       ARCANA_APP__ENVIRONMENT: production
+      # No certificate pair is mounted in this stack; see config/production.toml.
+      ARCANA_SECURITY__GRPC_TLS_ENABLED: "false"
       ARCANA_DEPLOYMENT__MODE: layeredgrpc
       ARCANA_DEPLOYMENT__LAYER: repository
       ARCANA_SERVER__GRPC_HOST: 0.0.0.0
@@ -80,6 +104,8 @@ services:
     environment:
       RUST_LOG: info,arcana=debug
       ARCANA_APP__ENVIRONMENT: production
+      # No certificate pair is mounted in this stack; see config/production.toml.
+      ARCANA_SECURITY__GRPC_TLS_ENABLED: "false"
       ARCANA_DEPLOYMENT__MODE: layeredgrpc
       ARCANA_DEPLOYMENT__LAYER: service
       ARCANA_SERVER__GRPC_HOST: 0.0.0.0
@@ -115,6 +141,8 @@ services:
     environment:
       RUST_LOG: info,arcana=debug
       ARCANA_APP__ENVIRONMENT: production
+      # No certificate pair is mounted in this stack; see config/production.toml.
+      ARCANA_SECURITY__GRPC_TLS_ENABLED: "false"
       ARCANA_DEPLOYMENT__MODE: layeredgrpc
       ARCANA_DEPLOYMENT__LAYER: controller
       ARCANA_SERVER__REST_HOST: 0.0.0.0
@@ -135,9 +163,82 @@ services:
       retries: 3
       start_period: 10s
 
+  # Worker - drains the job queues.
+  #
+  # Stateless: no database, no inbound API. Scale with
+  # `docker compose up -d --scale worker=N` (drop the container_name first).
+  worker:
+    build:
+      context: ../..
+      dockerfile: deployment/layered/Dockerfile
+      args:
+        LAYER: worker
+    container_name: arcana-worker
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info,arcana=debug
+      ARCANA_APP__ENVIRONMENT: production
+      # No certificate pair is mounted in this stack; see config/production.toml.
+      ARCANA_SECURITY__GRPC_TLS_ENABLED: "false"
+      ARCANA_DEPLOYMENT__MODE: layeredgrpc
+      ARCANA_DEPLOYMENT__LAYER: worker
+      ARCANA_SERVER__REST_HOST: 0.0.0.0
+      ARCANA_SERVER__REST_PORT: 8080
+      ARCANA_JOBS__ENABLED: "true"
+      ARCANA_JOBS__REDIS__URL: redis://redis:6379
+      ARCANA_JOBS__WORKER__CONCURRENCY: 4
+      ARCANA_JOBS__WORKER__QUEUES: critical,high,default,low
+    networks:
+      - arcana-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Scheduler - fires cron entries.
+  #
+  # Leadership is a Redis key, so extra replicas are warm standby only; never
+  # scale this for throughput.
+  scheduler:
+    build:
+      context: ../..
+      dockerfile: deployment/layered/Dockerfile
+      args:
+        LAYER: scheduler
+    container_name: arcana-scheduler
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info,arcana=debug
+      ARCANA_APP__ENVIRONMENT: production
+      # No certificate pair is mounted in this stack; see config/production.toml.
+      ARCANA_SECURITY__GRPC_TLS_ENABLED: "false"
+      ARCANA_DEPLOYMENT__MODE: layeredgrpc
+      ARCANA_DEPLOYMENT__LAYER: scheduler
+      ARCANA_SERVER__REST_HOST: 0.0.0.0
+      ARCANA_SERVER__REST_PORT: 8080
+      ARCANA_JOBS__ENABLED: "true"
+      ARCANA_JOBS__REDIS__URL: redis://redis:6379
+      ARCANA_JOBS__SCHEDULER__LEADER_TTL_SECS: 30
+      ARCANA_JOBS__SCHEDULER__CHECK_INTERVAL_SECS: 60
+    networks:
+      - arcana-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 networks:
   arcana-network:
     driver: bridge
 
 volumes:
   mysql_data:
+  redis_data:

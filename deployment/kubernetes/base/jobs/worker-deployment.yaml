@@ -1,3 +1,11 @@
+# Background job worker.
+#
+# Role selection is the ARCANA_DEPLOYMENT__LAYER env var -- the binary parses
+# no command-line flags, so `args` here would be silently ignored.
+#
+# Sizing: stateless, holds only a Redis pool. Scales on queue depth, not on
+# request rate. Concurrency x job cost drives memory, so raise the limit
+# alongside ARCANA_JOBS__WORKER__CONCURRENCY, not independently of it.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,36 +28,38 @@ spec:
         tier: worker
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/port: "8080"
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: arcana-worker
+      # Must exceed jobs.worker.shutdown_timeout_secs (30) so in-flight jobs
+      # finish instead of being killed mid-execution.
+      terminationGracePeriodSeconds: 60
       containers:
         - name: worker
           image: arcana-server:latest
           imagePullPolicy: IfNotPresent
-          command: ["./arcana-server"]
-          args: ["--mode", "worker"]
           ports:
-            - name: metrics
-              containerPort: 9090
+            # One port serves /health, /live, /ready and /metrics.
+            - name: http
+              containerPort: 8080
               protocol: TCP
-            - name: health
-              containerPort: 8081
-              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: arcana-jobs-env
           env:
-            - name: RUST_LOG
-              value: "info,arcana=debug"
-            - name: APP__MODE
+            - name: ARCANA_DEPLOYMENT__LAYER
               value: "worker"
-            - name: APP__JOBS__REDIS__URL
+            - name: ARCANA_JOBS__ENABLED
+              value: "true"
+            - name: ARCANA_JOBS__REDIS__URL
               valueFrom:
                 secretKeyRef:
-                  name: arcana-secrets
+                  name: arcana-jobs-secrets
                   key: redis-url
-            - name: APP__JOBS__WORKER__CONCURRENCY
+            - name: ARCANA_JOBS__WORKER__CONCURRENCY
               value: "4"
-            - name: APP__JOBS__WORKER__QUEUES
+            - name: ARCANA_JOBS__WORKER__QUEUES
               value: "critical,high,default,low"
             - name: POD_NAME
               valueFrom:
@@ -68,16 +78,16 @@ spec:
               cpu: "500m"
           livenessProbe:
             httpGet:
-              path: /health
-              port: health
+              path: /live
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health/ready
-              port: health
+              path: /ready
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
@@ -113,8 +123,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 9090
-      targetPort: metrics
+    # Named "metrics" because the ServiceMonitor selects the port by name.
+    - port: 8080
+      targetPort: http
       protocol: TCP
       name: metrics
   selector:
@@ -129,6 +140,10 @@ metadata:
     app: arcana
     component: job-worker
 ---
+# The worker is the only job role that may autoscale: it is stateless and its
+# backlog is directly observable. `arcana_jobs_pending` requires the Prometheus
+# adapter to be installed; without it this metric is ignored and only the CPU
+# target applies.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

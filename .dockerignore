@@ -1,0 +1,35 @@
+# Build context hygiene.
+#
+# Without this the context is the whole repo -- including target/, which is
+# several gigabytes. Every `docker build` then spends minutes uploading files
+# the Dockerfile immediately discards, and busts the layer cache on any local
+# rebuild.
+
+target/
+**/target/
+
+.git/
+.gitignore
+.github/
+
+# Claude Code / editor scratch space
+.claude/
+.idea/
+.vscode/
+*.swp
+
+# Local-only config and secrets
+.env
+.env.*
+config/local.toml
+
+# Build outputs and reports that never belong in an image
+benchmark_results/
+coverage/
+*.profraw
+*.lcov
+
+# Docs and CI descriptors the binary does not need
+docs/
+*.md
+!README.md
