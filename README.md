@@ -1161,8 +1161,8 @@ open tarpaulin-report.html
 | **REST Framework** | Axum | 0.8 |
 | **gRPC Framework** | Tonic | 0.14 |
 | **Database** | SQLx | 0.9 |
-| **WASM Runtime** | Wasmtime | 45 |
-| **JWT** | jsonwebtoken | 10.0 |
+| **WASM Runtime** | Wasmtime | 47 |
+| **JWT** | jsonwebtoken | 11.0 |
 | **Password Hashing** | Argon2 | 0.5 |
 | **Rate Limiting** | Governor | 0.10 |
 | **Serialization** | Serde | 1.0 |
