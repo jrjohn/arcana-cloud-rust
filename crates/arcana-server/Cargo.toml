@@ -22,6 +22,7 @@ arcana-security.workspace = true
 arcana-service.workspace = true
 arcana-rest.workspace = true
 arcana-grpc.workspace = true
+arcana-jobs.workspace = true
 arcana-resilience.workspace = true
 axum.workspace = true
 tower-http.workspace = true
@@ -36,6 +37,8 @@ serde = { workspace = true }
 serde_json.workspace = true
 shaku.workspace = true
 deadpool-redis.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

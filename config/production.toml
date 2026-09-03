@@ -16,8 +16,15 @@ max_connections = 50
 log_queries = false
 
 [security]
-# jwt_secret should be set via environment variable ARCANA__SECURITY__JWT_SECRET
+# jwt_secret should be set via environment variable ARCANA_SECURITY__JWT_SECRET
+#
+# In-mesh gRPC TLS is the production intent, but it needs a mounted key pair:
+# enabling it without `tls_cert_path` / `tls_key_path` is an unsatisfiable
+# config and the process refuses to start. Deployments that terminate TLS at
+# the ingress instead set ARCANA_SECURITY__GRPC_TLS_ENABLED=false explicitly.
 grpc_tls_enabled = true
+# tls_cert_path = "/etc/arcana/tls/tls.crt"
+# tls_key_path = "/etc/arcana/tls/tls.key"
 password_hash_cost = 14
 
 [plugins]
@@ -28,6 +35,19 @@ verify_signatures = true
 runtime_pool_size = 8
 cache_enabled = true
 cache_ttl_secs = 600
+
+[jobs]
+# Dedicated worker/scheduler pods run the subsystem regardless of this flag;
+# it only controls whether an all-in-one process also hosts them in-process.
+enabled = false
+
+[jobs.redis]
+pool_size = 20
+
+[jobs.worker]
+# Raise together with the pod CPU limit: this is the concurrency per pod, and
+# throughput is scaled by adding worker pods, not by oversubscribing one.
+concurrency = 8
 
 [observability]
 log_level = "info"

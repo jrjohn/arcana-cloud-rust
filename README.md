@@ -554,19 +554,23 @@ scheduler.start().await?;
 ### Kubernetes Deployment
 
 ```bash
-# Deploy job queue components
-kubectl apply -k deployment/kubernetes/jobs/
+# Deploy job queue components (included in the base kustomization already)
+kubectl apply -k deployment/kubernetes/base/jobs/
 
-# Scale workers based on queue depth
-kubectl apply -f deployment/kubernetes/jobs/worker-deployment.yaml
+# Workers autoscale on queue depth via the HPA; to change the bounds:
+kubectl edit hpa arcana-job-worker-hpa -n arcana
 
 # Check worker status
 kubectl get pods -l component=job-worker
 
-# View metrics
-kubectl port-forward svc/arcana-job-worker 9090:9090
-curl localhost:9090/metrics | grep arcana_jobs
+# View metrics (health probes and /metrics share port 8080 on job roles)
+kubectl port-forward svc/arcana-job-worker 8080:8080
+curl localhost:8080/metrics | grep arcana_jobs
 ```
+
+The worker and the scheduler are the same binary as the API pods, selected by
+`ARCANA_DEPLOYMENT__LAYER=worker` / `scheduler`. In monolithic deployments set
+`ARCANA_JOBS__ENABLED=true` instead and the one process hosts both in-process.
 
 ---
 
@@ -864,7 +868,15 @@ Configuration loads from multiple sources in order (later overrides earlier):
 ARCANA_ENVIRONMENT=production
 ARCANA_DEPLOYMENT_MODE=layeredgrpc
 
-# Database (use double underscore for nested config)
+# Deployment role: all | controller | service | repository | worker | scheduler
+ARCANA_DEPLOYMENT__LAYER=all
+
+# Database
+#
+# Spelling rule: ONE underscore after the ARCANA prefix, TWO between config
+# levels. `__` separates levels, not words -- the field is `server.rest_port`,
+# so it is ARCANA_SERVER__REST_PORT, not ARCANA_SERVER__REST__PORT. An
+# unmatched variable is discarded silently and the process runs on defaults.
 ARCANA_DATABASE__URL=mysql://user:pass@host:3306/arcana
 ARCANA_DATABASE__MAX_CONNECTIONS=20
 
@@ -873,8 +885,8 @@ ARCANA_SECURITY__JWT_SECRET=your-256-bit-secret
 ARCANA_SECURITY__JWT_ACCESS_EXPIRATION_SECS=3600
 
 # Server
-ARCANA_SERVER__REST__PORT=8080
-ARCANA_SERVER__GRPC__PORT=9090
+ARCANA_SERVER__REST_PORT=8080
+ARCANA_SERVER__GRPC_PORT=9090
 
 # Plugins
 ARCANA_PLUGINS__ENABLED=true

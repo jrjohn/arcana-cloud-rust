@@ -6,7 +6,7 @@ kind: Kustomization
 namespace: arcana-dev
 
 resources:
-  - ../../
+  - ../../base
 
 namePrefix: dev-
 
@@ -59,6 +59,10 @@ patches:
 # Override config for dev
 configMapGenerator:
   - name: arcana-config
+    # The base manifests carry `namespace: arcana` in their own metadata, so a
+    # merge generator must name that namespace to find them; without it
+    # kustomize looks in the default namespace and fails the build.
+    namespace: arcana
     behavior: merge
     literals:
       - RUST_LOG=debug,arcana=trace

@@ -57,6 +57,35 @@ cache_enabled = true
 cache_ttl_secs = 300
 render_timeout_ms = 5000
 
+[jobs]
+# Master switch for the background job subsystem.
+#
+# A dedicated `worker` / `scheduler` deployment layer always runs it. In a
+# monolithic (single-container) deployment this decides whether the same
+# process also hosts an embedded worker and scheduler, so a stack without
+# Redis still starts. Set ARCANA_JOBS__ENABLED=true to turn it on.
+enabled = false
+
+[jobs.redis]
+url = "redis://localhost:6379"
+pool_size = 10
+connect_timeout_secs = 5
+key_prefix = "arcana:jobs"
+
+[jobs.worker]
+concurrency = 4
+# Drained in list order, so the highest priority queue comes first.
+queues = ["critical", "high", "default", "low"]
+job_timeout_secs = 300
+poll_interval_ms = 100
+shutdown_timeout_secs = 30
+heartbeat_interval_secs = 30
+
+[jobs.scheduler]
+enabled = true
+check_interval_secs = 30
+leader_ttl_secs = 60
+
 [observability]
 log_level = "debug"
 log_format = "pretty"
