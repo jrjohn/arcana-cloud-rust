@@ -344,14 +344,20 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
         let now = Utc::now();
         let mut conn = self.pool.get().await?;
 
-        let jobs_to_run: Vec<(String, JobData)> = {
+        // Snapshot the registry first: the loop below awaits on Redis, and the
+        // registry guard is a parking_lot lock that must never be held across
+        // an await -- doing so both deadlocks under contention and makes this
+        // future non-Send, which prevents the scheduler from being spawned.
+        let enabled_jobs: Vec<ScheduledJob> = {
             let jobs = self.jobs.read();
+            jobs.values().filter(|job| job.enabled).cloned().collect()
+        };
+
+        let jobs_to_run: Vec<(String, JobData)> = {
             let mut to_run = Vec::new();
 
-            for (name, scheduled_job) in jobs.iter() {
-                if !scheduled_job.enabled {
-                    continue;
-                }
+            for scheduled_job in &enabled_jobs {
+                let name = &scheduled_job.name;
 
                 // Check last run time from Redis
                 let last_run_key = format!("{}:last_run:{}", self.keys.scheduled(), name);
@@ -557,6 +563,19 @@ pub mod cron_expressions {
 
     /// First day of every month at midnight.
     pub const MONTHLY: &str = "0 0 0 1 * *";
+}
+
+
+/// Compile-time guard: `Scheduler::start` must stay `Send`.
+///
+/// A `parking_lot` guard held across an `.await` silently makes this future
+/// `!Send`, which means it can no longer be spawned as a task -- the failure
+/// shows up as a build error in the caller, far from the cause. This function
+/// is never called; it exists so the regression fails here instead.
+#[allow(dead_code)]
+fn assert_scheduler_start_future_is_send<Q: JobQueue + Send + Sync + 'static>(inner: &Scheduler<Q>) {
+    fn is_send<T: Send>(_: &T) {}
+    is_send(&inner.start());
 }
 
 #[cfg(test)]

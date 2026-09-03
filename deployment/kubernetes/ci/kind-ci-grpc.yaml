@@ -173,25 +173,25 @@ spec:
               containerPort: 9090
               protocol: TCP
           env:
-            - name: ARCANA__APP__ENVIRONMENT
+            - name: ARCANA_APP__ENVIRONMENT
               value: "ci"
-            - name: ARCANA__DEPLOYMENT__MODE
+            - name: ARCANA_DEPLOYMENT__MODE
               value: "layeredgrpc"
-            - name: ARCANA__DEPLOYMENT__LAYER
+            - name: ARCANA_DEPLOYMENT__LAYER
               value: "repository"
-            - name: ARCANA__SERVER__GRPC_HOST
+            - name: ARCANA_SERVER__GRPC_HOST
               value: "0.0.0.0"
-            - name: ARCANA__SERVER__GRPC_PORT
+            - name: ARCANA_SERVER__GRPC_PORT
               value: "9090"
-            - name: ARCANA__DATABASE__URL
+            - name: ARCANA_DATABASE__URL
               value: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
-            - name: ARCANA__REDIS__URL
+            - name: ARCANA_REDIS__URL
               value: "redis://redis:6379"
-            - name: ARCANA__SECURITY__JWT_SECRET
+            - name: ARCANA_SECURITY__JWT_SECRET
               value: "ci-secret-key-minimum-32-characters-for-testing"
-            - name: ARCANA__SECURITY__JWT_ISSUER
+            - name: ARCANA_SECURITY__JWT_ISSUER
               value: "arcana-cloud"
-            - name: ARCANA__SECURITY__JWT_AUDIENCE
+            - name: ARCANA_SECURITY__JWT_AUDIENCE
               value: "arcana-api"
           readinessProbe:
             tcpSocket:
@@ -257,27 +257,27 @@ spec:
               containerPort: 9090
               protocol: TCP
           env:
-            - name: ARCANA__APP__ENVIRONMENT
+            - name: ARCANA_APP__ENVIRONMENT
               value: "ci"
-            - name: ARCANA__DEPLOYMENT__MODE
+            - name: ARCANA_DEPLOYMENT__MODE
               value: "layeredgrpc"
-            - name: ARCANA__DEPLOYMENT__LAYER
+            - name: ARCANA_DEPLOYMENT__LAYER
               value: "service"
-            - name: ARCANA__SERVER__GRPC_HOST
+            - name: ARCANA_SERVER__GRPC_HOST
               value: "0.0.0.0"
-            - name: ARCANA__SERVER__GRPC_PORT
+            - name: ARCANA_SERVER__GRPC_PORT
               value: "9090"
-            - name: ARCANA__DATABASE__URL
+            - name: ARCANA_DATABASE__URL
               value: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
-            - name: ARCANA__REDIS__URL
+            - name: ARCANA_REDIS__URL
               value: "redis://redis:6379"
-            - name: ARCANA__SECURITY__JWT_SECRET
+            - name: ARCANA_SECURITY__JWT_SECRET
               value: "ci-secret-key-minimum-32-characters-for-testing"
-            - name: ARCANA__SECURITY__JWT_ISSUER
+            - name: ARCANA_SECURITY__JWT_ISSUER
               value: "arcana-cloud"
-            - name: ARCANA__SECURITY__JWT_AUDIENCE
+            - name: ARCANA_SECURITY__JWT_AUDIENCE
               value: "arcana-api"
-            - name: ARCANA__DEPLOYMENT__REPOSITORY_URL
+            - name: ARCANA_DEPLOYMENT__REPOSITORY_URL
               value: "http://arcana-ci-repository:9090"
           readinessProbe:
             tcpSocket:
@@ -343,27 +343,27 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            - name: ARCANA__APP__ENVIRONMENT
+            - name: ARCANA_APP__ENVIRONMENT
               value: "ci"
-            - name: ARCANA__DEPLOYMENT__MODE
+            - name: ARCANA_DEPLOYMENT__MODE
               value: "layeredgrpc"
-            - name: ARCANA__DEPLOYMENT__LAYER
+            - name: ARCANA_DEPLOYMENT__LAYER
               value: "controller"
-            - name: ARCANA__SERVER__REST_HOST
+            - name: ARCANA_SERVER__REST_HOST
               value: "0.0.0.0"
-            - name: ARCANA__SERVER__REST_PORT
+            - name: ARCANA_SERVER__REST_PORT
               value: "8080"
-            - name: ARCANA__DATABASE__URL
+            - name: ARCANA_DATABASE__URL
               value: "mysql://arcana:ci_arcana@mysql:3306/arcana_cloud"
-            - name: ARCANA__REDIS__URL
+            - name: ARCANA_REDIS__URL
               value: "redis://redis:6379"
-            - name: ARCANA__SECURITY__JWT_SECRET
+            - name: ARCANA_SECURITY__JWT_SECRET
               value: "ci-secret-key-minimum-32-characters-for-testing"
-            - name: ARCANA__SECURITY__JWT_ISSUER
+            - name: ARCANA_SECURITY__JWT_ISSUER
               value: "arcana-cloud"
-            - name: ARCANA__SECURITY__JWT_AUDIENCE
+            - name: ARCANA_SECURITY__JWT_AUDIENCE
               value: "arcana-api"
-            - name: ARCANA__DEPLOYMENT__SERVICE_URL
+            - name: ARCANA_DEPLOYMENT__SERVICE_URL
               value: "http://arcana-ci-service:9090"
           readinessProbe:
             httpGet:

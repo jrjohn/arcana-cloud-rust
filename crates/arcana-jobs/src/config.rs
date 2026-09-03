@@ -6,6 +6,15 @@ use std::time::Duration;
 /// Configuration for the job queue system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobsConfig {
+    /// Whether this process runs the job subsystem at all.
+    ///
+    /// A dedicated `worker` / `scheduler` deployment layer always runs it. In
+    /// monolithic (single-container) deployments this flag decides whether the
+    /// same process also hosts an embedded worker and scheduler, so a Compose
+    /// stack without Redis still starts.
+    #[serde(default)]
+    pub enabled: bool,
+
     /// Redis connection configuration.
     #[serde(default)]
     pub redis: RedisConfig,
@@ -26,6 +35,7 @@ pub struct JobsConfig {
 impl Default for JobsConfig {
     fn default() -> Self {
         Self {
+            enabled: false,
             redis: RedisConfig::default(),
             worker: WorkerConfig::default(),
             queue: QueueConfig::default(),
@@ -88,6 +98,10 @@ pub struct WorkerConfig {
     #[serde(default = "default_concurrency")]
     pub concurrency: usize,
 
+    /// Queues this worker polls, highest priority first.
+    #[serde(default = "default_queues")]
+    pub queues: Vec<String>,
+
     /// Job execution timeout in seconds.
     #[serde(default = "default_job_timeout")]
     pub job_timeout_secs: u64,
@@ -109,6 +123,7 @@ impl Default for WorkerConfig {
     fn default() -> Self {
         Self {
             concurrency: default_concurrency(),
+            queues: default_queues(),
             job_timeout_secs: default_job_timeout(),
             poll_interval_ms: default_poll_interval(),
             shutdown_timeout_secs: default_shutdown_timeout(),
@@ -123,6 +138,15 @@ fn default_concurrency() -> usize {
         .map(|p| p.get())
         .unwrap_or(4)
         .max(4)
+}
+
+fn default_queues() -> Vec<String> {
+    vec![
+        "critical".to_string(),
+        "high".to_string(),
+        "default".to_string(),
+        "low".to_string(),
+    ]
 }
 
 fn default_job_timeout() -> u64 {
@@ -479,9 +503,23 @@ mod tests {
     }
 
     #[test]
+    fn test_worker_config_default_queues_are_priority_ordered() {
+        // A worker drains queues in list order, so "critical" must come first.
+        let cfg = WorkerConfig::default();
+        assert_eq!(cfg.queues, vec!["critical", "high", "default", "low"]);
+    }
+
+    #[test]
+    fn test_jobs_disabled_by_default() {
+        // A deployment without Redis must still start.
+        assert!(!JobsConfig::default().enabled);
+    }
+
+    #[test]
     fn test_worker_config_custom_durations() {
         let cfg = WorkerConfig {
             concurrency: 8,
+            queues: vec!["default".to_string()],
             job_timeout_secs: 600,
             poll_interval_ms: 250,
             shutdown_timeout_secs: 60,

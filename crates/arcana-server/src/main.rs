@@ -9,20 +9,22 @@
 
 use arcana_config::{AppConfig, ConfigLoader, DeploymentLayer, DeploymentMode};
 use arcana_core::ArcanaResult;
+use arcana_jobs::JobsConfig;
 use arcana_rest::create_router;
-use tokio::signal;
 use tracing::{error, info};
 
 use arcana_server::di::{
     build_distributed_service_module, build_monolithic_module, build_repository_module,
     DatabaseResolver, RepositoryResolver, ServiceResolver,
 };
+use arcana_server::jobs_runtime;
+use arcana_server::shutdown::wait_for_signal as shutdown_signal;
 
 #[tokio::main]
 async fn main() {
     // Load configuration first (needed for telemetry setup)
-    let config = match load_config().await {
-        Ok(config) => config,
+    let (config, jobs_config) = match load_config().await {
+        Ok(loaded) => loaded,
         Err(e) => {
             // Fall back to basic logging if config fails
             init_basic_logging();
@@ -40,7 +42,7 @@ async fn main() {
     info!("Starting Arcana Cloud Rust Server...");
     info!("Version: {}", env!("CARGO_PKG_VERSION"));
 
-    if let Err(e) = run_with_config(config).await {
+    if let Err(e) = run_with_config(config, jobs_config).await {
         error!("Application error: {}", e);
         arcana_core::telemetry::shutdown_telemetry();
         std::process::exit(1);
@@ -49,9 +51,19 @@ async fn main() {
     arcana_core::telemetry::shutdown_telemetry();
 }
 
-async fn load_config() -> ArcanaResult<AppConfig> {
+/// Loads the application configuration plus the `[jobs]` section.
+///
+/// `arcana-jobs` depends on `arcana-config`, so `JobsConfig` cannot live inside
+/// `AppConfig`. It is read through the same loader instead of a second set of
+/// rules, so file layering and `ARCANA_` env overrides behave identically.
+async fn load_config() -> ArcanaResult<(AppConfig, JobsConfig)> {
     let config_loader = ConfigLoader::from_default_location()?;
-    Ok(config_loader.get().await)
+    let app_config = config_loader.get().await;
+    let jobs_config = config_loader
+        .section::<JobsConfig>("jobs")
+        .await?
+        .unwrap_or_default();
+    Ok((app_config, jobs_config))
 }
 
 fn init_telemetry(config: &AppConfig) -> ArcanaResult<()> {
@@ -71,21 +83,34 @@ fn init_basic_logging() {
         .try_init();
 }
 
-async fn run_with_config(config: AppConfig) -> ArcanaResult<()> {
+async fn run_with_config(config: AppConfig, jobs_config: JobsConfig) -> ArcanaResult<()> {
     info!("Environment: {}", config.app.environment);
     info!("Deployment mode: {}", config.deployment.mode);
     info!("Layer: {}", config.deployment.layer);
 
+    // Background job roles serve no API and open no database pool, so they are
+    // dispatched on the layer alone -- they behave the same under every
+    // deployment mode, including plain Docker Compose.
+    if config.deployment.layer.is_job_role() {
+        return match config.deployment.layer {
+            DeploymentLayer::Worker => jobs_runtime::run_worker(config, jobs_config).await,
+            DeploymentLayer::Scheduler => jobs_runtime::run_scheduler(config, jobs_config).await,
+            other => Err(arcana_core::ArcanaError::Configuration(format!(
+                "layer '{other}' is not a job role"
+            ))),
+        };
+    }
+
     // Initialize components based on deployment mode
     match config.deployment.mode {
         DeploymentMode::Monolithic => {
-            run_monolithic(config).await?;
+            run_monolithic(config, jobs_config).await?;
         }
         DeploymentMode::LayeredGrpc | DeploymentMode::KubernetesGrpc => {
-            run_layered_grpc(config).await?;
+            run_layered_grpc(config, jobs_config).await?;
         }
         DeploymentMode::LayeredHttp | DeploymentMode::KubernetesHttp => {
-            run_layered_http(config).await?;
+            run_layered_http(config, jobs_config).await?;
         }
     }
 
@@ -93,11 +118,11 @@ async fn run_with_config(config: AppConfig) -> ArcanaResult<()> {
 }
 
 /// Run in layered mode with gRPC inter-service communication.
-async fn run_layered_grpc(config: AppConfig) -> ArcanaResult<()> {
+async fn run_layered_grpc(config: AppConfig, jobs_config: JobsConfig) -> ArcanaResult<()> {
     match config.deployment.layer {
         DeploymentLayer::All => {
             info!("Running all layers (equivalent to monolithic)");
-            run_monolithic(config).await
+            run_monolithic(config, jobs_config).await
         }
         DeploymentLayer::Controller => {
             run_controller_layer_grpc(config).await
@@ -108,15 +133,19 @@ async fn run_layered_grpc(config: AppConfig) -> ArcanaResult<()> {
         DeploymentLayer::Repository => {
             run_repository_layer(config).await
         }
+        DeploymentLayer::Worker | DeploymentLayer::Scheduler => {
+            // Unreachable: job roles are dispatched before the mode branch.
+            unreachable!("job roles are dispatched in run_with_config")
+        }
     }
 }
 
 /// Run in layered mode with HTTP inter-service communication.
-async fn run_layered_http(config: AppConfig) -> ArcanaResult<()> {
+async fn run_layered_http(config: AppConfig, jobs_config: JobsConfig) -> ArcanaResult<()> {
     match config.deployment.layer {
         DeploymentLayer::All => {
             info!("Running all layers (equivalent to monolithic)");
-            run_monolithic(config).await
+            run_monolithic(config, jobs_config).await
         }
         DeploymentLayer::Controller => {
             run_controller_layer_http(config).await
@@ -127,10 +156,14 @@ async fn run_layered_http(config: AppConfig) -> ArcanaResult<()> {
         DeploymentLayer::Repository => {
             run_repository_layer(config).await
         }
+        DeploymentLayer::Worker | DeploymentLayer::Scheduler => {
+            // Unreachable: job roles are dispatched before the mode branch.
+            unreachable!("job roles are dispatched in run_with_config")
+        }
     }
 }
 
-async fn run_monolithic(config: AppConfig) -> ArcanaResult<()> {
+async fn run_monolithic(config: AppConfig, jobs_config: JobsConfig) -> ArcanaResult<()> {
     // Build Shaku DI module with all components
     let module = build_monolithic_module(&config.database, &config.redis, config.security.clone()).await?;
 
@@ -155,15 +188,24 @@ async fn run_monolithic(config: AppConfig) -> ArcanaResult<()> {
     // Create gRPC server
     let grpc_server = arcana_grpc::GrpcServer::new(&config.server, user_service, auth_service)?;
 
+    // A monolithic deployment is one container that does everything, so it
+    // hosts the job runtime in-process rather than in separate pods.
+    let embedded_jobs = jobs_runtime::spawn_embedded(&jobs_config).await?;
+
     // Run both servers concurrently
-    tokio::select! {
+    let result = tokio::select! {
         result = axum::serve(listener, router).with_graceful_shutdown(shutdown_signal()) => {
-            result.map_err(|e| arcana_core::ArcanaError::Internal(format!("REST server error: {}", e)))?;
+            result.map_err(|e| arcana_core::ArcanaError::Internal(format!("REST server error: {}", e)))
         }
         result = grpc_server.serve() => {
-            result?;
+            result
         }
+    };
+
+    if let Some(jobs) = embedded_jobs {
+        jobs.shutdown().await;
     }
+    result?;
 
     info!("Server shutdown complete");
     Ok(())
@@ -346,32 +388,4 @@ fn create_router_legacy(
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(logging_middleware))
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {
-            info!("Received Ctrl+C, initiating graceful shutdown...");
-        }
-        _ = terminate => {
-            info!("Received terminate signal, initiating graceful shutdown...");
-        }
-    }
 }

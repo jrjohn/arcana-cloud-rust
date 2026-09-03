@@ -15,7 +15,7 @@ kind: Kustomization
 namespace: arcana-grpc
 
 resources:
-  - ../../
+  - ../../base
 
 namePrefix: grpc-
 
@@ -51,9 +51,9 @@ patches:
             value: "controller"
           - name: ARCANA_DEPLOYMENT__SERVICE_URL
             value: "http://grpc-arcana-service:9090"
-          - name: ARCANA_SERVER__REST__HOST
+          - name: ARCANA_SERVER__REST_HOST
             value: "0.0.0.0"
-          - name: ARCANA_SERVER__REST__PORT
+          - name: ARCANA_SERVER__REST_PORT
             value: "8080"
           - name: RUST_LOG
             value: "info,arcana=debug"
@@ -74,9 +74,9 @@ patches:
             value: "service"
           - name: ARCANA_DEPLOYMENT__REPOSITORY_URL
             value: "http://grpc-arcana-repository:9090"
-          - name: ARCANA_SERVER__GRPC__HOST
+          - name: ARCANA_SERVER__GRPC_HOST
             value: "0.0.0.0"
-          - name: ARCANA_SERVER__GRPC__PORT
+          - name: ARCANA_SERVER__GRPC_PORT
             value: "9090"
           - name: RUST_LOG
             value: "info,arcana=debug"
@@ -95,9 +95,9 @@ patches:
             value: "layeredgrpc"
           - name: ARCANA_DEPLOYMENT__LAYER
             value: "repository"
-          - name: ARCANA_SERVER__GRPC__HOST
+          - name: ARCANA_SERVER__GRPC_HOST
             value: "0.0.0.0"
-          - name: ARCANA_SERVER__GRPC__PORT
+          - name: ARCANA_SERVER__GRPC_PORT
             value: "9090"
           - name: ARCANA_DATABASE__URL
             valueFrom:
@@ -121,6 +121,10 @@ patches:
 # gRPC-specific config
 configMapGenerator:
   - name: arcana-config
+    # The base manifests carry `namespace: arcana` in their own metadata, so a
+    # merge generator must name that namespace to find them; without it
+    # kustomize looks in the default namespace and fails the build.
+    namespace: arcana
     behavior: merge
     literals:
       - ARCANA_PROTOCOL=grpc

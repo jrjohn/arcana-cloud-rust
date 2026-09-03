@@ -13,6 +13,12 @@ use tracing::{debug, info, warn};
 #[derive(Clone)]
 pub struct ConfigLoader {
     config: Arc<RwLock<AppConfig>>,
+    /// The merged, untyped source tree behind `config`.
+    ///
+    /// Kept so crates that own their own configuration section (for example
+    /// `arcana-jobs`, which cannot be a dependency of this crate) deserialize
+    /// it through the *same* layered rules instead of re-implementing them.
+    raw: Arc<RwLock<Config>>,
     config_dir: String,
 }
 
@@ -26,10 +32,11 @@ impl ConfigLoader {
     /// 4. Environment variables with `ARCANA_` prefix
     pub fn new(config_dir: impl Into<String>) -> Result<Self, ArcanaError> {
         let config_dir = config_dir.into();
-        let config = Self::load_config(&config_dir)?;
+        let (config, raw) = Self::load_config(&config_dir)?;
 
         Ok(Self {
             config: Arc::new(RwLock::new(config)),
+            raw: Arc::new(RwLock::new(raw)),
             config_dir,
         })
     }
@@ -44,17 +51,40 @@ impl ConfigLoader {
         self.config.read().await.clone()
     }
 
+    /// Deserializes one top-level configuration section by key.
+    ///
+    /// Returns `Ok(None)` when the section is absent, so a caller can fall back
+    /// to its own defaults. Any other deserialization failure is an error --
+    /// a malformed section must never be silently replaced by defaults.
+    pub async fn section<T: serde::de::DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, ArcanaError> {
+        let raw = self.raw.read().await;
+        match raw.get::<T>(key) {
+            Ok(value) => Ok(Some(value)),
+            Err(ConfigError::NotFound(_)) => Ok(None),
+            Err(e) => Err(config_error_to_arcana_error(e)),
+        }
+    }
+
     /// Reloads the configuration from disk.
     pub async fn reload(&self) -> Result<(), ArcanaError> {
-        let new_config = Self::load_config(&self.config_dir)?;
-        let mut config = self.config.write().await;
-        *config = new_config;
+        let (new_config, new_raw) = Self::load_config(&self.config_dir)?;
+        {
+            let mut config = self.config.write().await;
+            *config = new_config;
+        }
+        {
+            let mut raw = self.raw.write().await;
+            *raw = new_raw;
+        }
         info!("Configuration reloaded successfully");
         Ok(())
     }
 
     /// Loads configuration from the specified directory.
-    fn load_config(config_dir: &str) -> Result<AppConfig, ArcanaError> {
+    fn load_config(config_dir: &str) -> Result<(AppConfig, Config), ArcanaError> {
         // Load .env file if present
         if let Err(e) = dotenvy::dotenv() {
             debug!("No .env file found or error loading it: {}", e);
@@ -99,24 +129,36 @@ impl ConfigLoader {
         }
 
         // 5. Override with environment variables (ARCANA_ prefix)
+        //
+        // `with_list_parse_key` is opt-in per key: comma splitting is applied
+        // only where a list is expected, so a value that legitimately contains
+        // a comma elsewhere is left intact.
         builder = builder.add_source(
             Environment::with_prefix("ARCANA")
+                // Without this, `config` falls back to using `separator` as the
+                // prefix separator too, so it would look for `ARCANA__FOO__BAR`
+                // and ignore every `ARCANA_FOO__BAR` variable the deployment
+                // manifests, Dockerfiles and Compose files actually set.
+                .prefix_separator("_")
                 .separator("__")
-                .try_parsing(true),
+                .try_parsing(true)
+                .list_separator(",")
+                .with_list_parse_key("jobs.worker.queues"),
         );
 
         let config = builder
             .build()
-            .map_err(|e| config_error_to_arcana_error(e))?;
+            .map_err(config_error_to_arcana_error)?;
 
         let app_config: AppConfig = config
+            .clone()
             .try_deserialize()
-            .map_err(|e| config_error_to_arcana_error(e))?;
+            .map_err(config_error_to_arcana_error)?;
 
         // Validate critical configuration
         Self::validate_config(&app_config)?;
 
-        Ok(app_config)
+        Ok((app_config, config))
     }
 
     /// Validates the configuration using comprehensive validation rules.
@@ -206,7 +248,7 @@ mod tests {
     fn test_database_config_default() {
         let config = DatabaseConfig::default();
         assert!(config.max_connections > 0);
-        assert!(config.min_connections >= 0);
+        assert!(config.min_connections <= config.max_connections);
     }
 
     #[test]
@@ -235,6 +277,139 @@ mod tests {
     fn test_app_config_default_name() {
         let config = AppConfig::default();
         assert!(!config.app.name.is_empty());
+    }
+
+    // =========================================================================
+    // Environment override contract
+    //
+    // Every deployment manifest, Dockerfile and Compose file in this repo
+    // configures the binary through `ARCANA_<SECTION>__<FIELD>`. These tests
+    // pin that spelling: `config` silently ignores an unmatched variable, so a
+    // regression here does not fail loudly -- it just makes every override
+    // vanish and the process run on file defaults.
+    // =========================================================================
+
+    /// Serialises the tests below: environment variables are process-global.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Copies the shipped `config/default.toml` into a scratch directory.
+    ///
+    /// Using the real file means these tests also fail if the defaults stop
+    /// parsing, and `local.toml` supplies only the one value that would
+    /// otherwise trip validation.
+    fn scratch_config_dir(tag: &str) -> String {
+        let dir = std::env::temp_dir().join(format!(
+            "arcana-config-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let shipped = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../config/default.toml");
+        std::fs::copy(&shipped, dir.join("default.toml"))
+            .unwrap_or_else(|e| panic!("copying {}: {e}", shipped.display()));
+
+        std::fs::write(
+            dir.join("local.toml"),
+            "[security]\njwt_secret = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+        )
+        .unwrap();
+
+        dir.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn test_single_underscore_after_prefix_overrides_config() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = scratch_config_dir("single");
+
+        std::env::set_var("ARCANA_DEPLOYMENT__LAYER", "worker");
+        std::env::set_var("ARCANA_APP__ENVIRONMENT", "staging");
+
+        let loader = ConfigLoader::new(&dir).expect("config should load");
+        let config = futures_lite_block_on(loader.get());
+
+        std::env::remove_var("ARCANA_DEPLOYMENT__LAYER");
+        std::env::remove_var("ARCANA_APP__ENVIRONMENT");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(config.deployment.layer, crate::DeploymentLayer::Worker);
+        assert_eq!(config.app.environment, "staging");
+    }
+
+    #[test]
+    fn test_double_underscore_after_prefix_is_not_an_override() {
+        // The opposite spelling must stay inert -- otherwise both forms
+        // "work" and neither manifest convention is authoritative.
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = scratch_config_dir("double");
+
+        std::env::set_var("ARCANA__DEPLOYMENT__LAYER", "worker");
+
+        let loader = ConfigLoader::new(&dir).expect("config should load");
+        let config = futures_lite_block_on(loader.get());
+
+        std::env::remove_var("ARCANA__DEPLOYMENT__LAYER");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(config.deployment.layer, crate::DeploymentLayer::All);
+    }
+
+    #[test]
+    fn test_section_reads_a_foreign_config_block() {
+        // `JobsConfig` lives in a crate that depends on this one, so the
+        // section is deserialized by the caller through the same loader.
+        #[derive(serde::Deserialize)]
+        struct WorkerSection {
+            queues: Vec<String>,
+        }
+        #[derive(serde::Deserialize)]
+        struct JobsSection {
+            worker: WorkerSection,
+        }
+
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = scratch_config_dir("section");
+
+        std::env::set_var("ARCANA_JOBS__WORKER__QUEUES", "critical,high");
+
+        let loader = ConfigLoader::new(&dir).expect("config should load");
+        let jobs = futures_lite_block_on(loader.section::<JobsSection>("jobs"))
+            .expect("section should deserialize")
+            .expect("jobs section should be present");
+
+        std::env::remove_var("ARCANA_JOBS__WORKER__QUEUES");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(jobs.worker.queues, vec!["critical", "high"]);
+    }
+
+    #[test]
+    fn test_section_absent_returns_none() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = scratch_config_dir("absent");
+
+        let loader = ConfigLoader::new(&dir).expect("config should load");
+        let missing =
+            futures_lite_block_on(loader.section::<std::collections::HashMap<String, String>>(
+                "not_a_real_section",
+            ))
+            .expect("absent section is not an error");
+
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(missing.is_none());
+    }
+
+    /// Minimal blocking executor so these tests need no async runtime.
+    fn futures_lite_block_on<F: std::future::Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(future)
     }
 
     #[test]

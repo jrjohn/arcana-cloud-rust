@@ -4,7 +4,7 @@ kind: Kustomization
 metadata:
   name: arcana-jobs
 
-namespace: default
+namespace: arcana
 
 labels:
   - includeSelectors: true
@@ -23,7 +23,10 @@ configMapGenerator:
   - name: arcana-jobs-env
     literals:
       - RUST_LOG=info,arcana=debug
-      - APP__MODE=worker
+      # Selects config/production.toml inside the image. The role itself is set
+      # per-Deployment via ARCANA_DEPLOYMENT__LAYER, never here.
+      - ARCANA_ENVIRONMENT=production
+      - ARCANA_APP__ENVIRONMENT=production
 
 images:
   - name: arcana-server

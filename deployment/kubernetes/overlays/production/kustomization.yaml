@@ -6,7 +6,7 @@ kind: Kustomization
 namespace: arcana-prod
 
 resources:
-  - ../../
+  - ../../base
 
 namePrefix: prod-
 
