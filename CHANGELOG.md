@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.0.1...v1.1.0) (2026-09-03)
+
+
+### Features
+
+* **deploy:** 把 pod 真的切開 —— worker/scheduler 成為獨立角色 ([#99](https://github.com/jrjohn/arcana-cloud-rust/issues/99)) ([8fed441](https://github.com/jrjohn/arcana-cloud-rust/commit/8fed441fe9d2d133c7ab6f5d9f024de6547c28b1))
+
 ## [1.0.1](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.0.0...v1.0.1) (2026-08-03)
 
 
