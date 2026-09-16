@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.coverage
-    image: localhost:5000/arcana/rust-coverage:latest
+    image: ${CI_COVERAGE_IMAGE:-localhost:5000/arcana/rust-coverage:latest}
     working_dir: /app
     volumes:
       # Mount source code
