@@ -23,6 +23,7 @@ pipeline {
         REGISTRY  = "localhost:5000"
         IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
         VERSION   = "1.0.0"
+        COVERAGE_IMAGE_TAG = "${REGISTRY}/arcana/rust-coverage"
     }
 
     stages {
@@ -118,14 +119,26 @@ pipeline {
             // Instead build the toolchain image, then copy source IN via a tar
             // stream and the lcov report OUT with docker cp (same pattern as the
             // Architecture Qube stage below).
+            //
+            // Build under the UNIQUE build-N name (same fix as "Docker Compose
+            // Build" above) so buildkit's containerd image store never re-exports
+            // the static `:latest` tag — a prior build's `:latest` lingering in the
+            // store (this stage has no Cleanup-style pruning) or a concurrent PR
+            // build exporting the same static name both fail export with
+            // `image "...:latest": already exists` (PR-104 build#1). Unlike
+            // rust-app:1.0.0, no downstream stage or registry push consumes this
+            // tag, so build-N is used directly with no `docker tag` step, and the
+            // build-N image is removed at the end of the stage instead of relying
+            // on "Cleanup Old Images" (which only rotates ${IMAGE_TAG}, not this
+            // image) to avoid leaking local disk across builds.
             steps {
-                sh "docker compose -f docker-compose.coverage.yml build coverage"
+                sh "CI_COVERAGE_IMAGE=${COVERAGE_IMAGE_TAG}:build-${BUILD_NUMBER} docker compose -f docker-compose.coverage.yml build coverage"
                 sh '''
                     set -e
                     COV="arcana-rust-coverage-${BUILD_NUMBER}"
                     docker rm -f "$COV" 2>/dev/null || true
                     docker create --name "$COV" -v /app -w /app \
-                        localhost:5000/arcana/rust-coverage:latest \
+                        "${COVERAGE_IMAGE_TAG}:build-${BUILD_NUMBER}" \
                         sh scripts/run-coverage.sh
                     tar --exclude=./.git --exclude=./target --exclude=./coverage \
                         --exclude=./arch-qube-reports --exclude=./.scannerwork \
@@ -136,6 +149,7 @@ pipeline {
                     mkdir -p coverage
                     docker cp "$COV":/app/coverage/. coverage/ 2>/dev/null || true
                     docker rm -f "$COV" 2>/dev/null || true
+                    docker rmi "${COVERAGE_IMAGE_TAG}:build-${BUILD_NUMBER}" 2>/dev/null || true
                     if [ -f coverage/lcov.info ]; then
                         sed -i "s|SF:/app/|SF:$(pwd)/|g" coverage/lcov.info
                         echo "Fixed LCOV paths: $(head -2 coverage/lcov.info)"
