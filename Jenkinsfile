@@ -86,7 +86,26 @@ pipeline {
             // was removed from docker-compose.test.yml's test command so the non-zero
             // cargo exit propagates out of `docker compose run`.
             steps {
-                sh "docker compose -f docker-compose.test.yml run --rm --build test"
+                // Named (not --rm) so the clippy JSON the same container wrote can be
+                // copied out for the SonarQube import; DinD makes compose bind mounts
+                // resolve to a stray host path, which is why docker cp is used here too
+                // (same reason as the coverage stage below).
+                sh '''
+                    set -e
+                    T="arcana-rust-test-${BUILD_NUMBER}"
+                    docker rm -f "$T" 2>/dev/null || true
+                    docker compose -f docker-compose.test.yml build test
+                    set +e
+                    docker compose -f docker-compose.test.yml run --name "$T" test
+                    RC=$?
+                    set -e
+                    rm -f clippy-report.json
+                    docker cp "$T":/app/clippy-report.json ./clippy-report.json 2>/dev/null \
+                        || echo "no clippy report produced"
+                    docker rm -f "$T" 2>/dev/null || true
+                    [ -f clippy-report.json ] && echo "clippy report: $(wc -l < clippy-report.json) json lines"
+                    exit $RC
+                '''
             }
         }
 
@@ -212,6 +231,7 @@ pipeline {
                       -Dsonar.sources=crates \
                       -Dsonar.exclusions=target/**,**/target/**,**/*.proto \
                       -Dsonar.rust.clippy.enabled=false \
+                      -Dsonar.rust.clippyReport.reportPaths=clippy-report.json \
                       -Dsonar.scm.disabled=true \
                       -Dsonar.rust.lcov.reportPaths=coverage/lcov.info"""
                     sh '''

@@ -12,7 +12,21 @@ services:
     # That matches the coverage lane's existing `--lib` choice ("skip database integration
     # tests that require a live DB"); those DB tests belong in a DB-provisioned lane.
     # --no-fail-fast still runs every unit test before returning non-zero.
-    command: ["sh", "-c", "cargo test --workspace --lib --bins --no-fail-fast 2>&1"]
+    # After the tests, run clippy over the same scope (--lib --bins) and write the JSON
+    # report SonarQube imports. Same container, so the debug artifacts cargo test just
+    # built are reused and clippy only re-checks the workspace crates (~1-2 min) instead
+    # of recompiling ~400 dependencies. Clippy never changes the build result: its exit
+    # code is dropped and the test exit code is what propagates.
+    command:
+      - sh
+      - -c
+      - |
+        cargo test --workspace --lib --bins --no-fail-fast 2>&1
+        RC=$$?
+        cargo clippy --workspace --lib --bins --message-format=json \
+          > /app/clippy-report.json 2> /app/clippy-stderr.txt || true
+        echo "clippy report: $$(wc -l < /app/clippy-report.json) json lines"
+        exit $$RC
 
   coverage:
     # ARM64-native: cargo-llvm-cov (tarpaulin is x86_64 only)

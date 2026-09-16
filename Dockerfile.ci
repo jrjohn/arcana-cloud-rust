@@ -5,6 +5,10 @@
 FROM rust:latest AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev protobuf-compiler && rm -rf /var/lib/apt/lists/*
+# clippy is not part of the rust image; the test lane runs it to produce the JSON report
+# SonarQube imports (sonar.rust.clippyReport.reportPaths). Builder stage only — the
+# runtime image is unchanged.
+RUN rustup component add clippy
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 COPY plugins plugins
