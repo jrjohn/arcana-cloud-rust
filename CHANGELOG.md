@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.2](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.1...v1.1.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate deadpool-redis to v0.23.1 ([#105](https://github.com/jrjohn/arcana-cloud-rust/issues/105)) ([b32bde4](https://github.com/jrjohn/arcana-cloud-rust/commit/b32bde4244f407671f694d650ae9b091f7f57f9f))
+* **deps:** update rust crate wasmtime to v48 ([#101](https://github.com/jrjohn/arcana-cloud-rust/issues/101)) ([d035b4b](https://github.com/jrjohn/arcana-cloud-rust/commit/d035b4b3530c14f1b1e4babe13bcf5e6a2a67bdd))
+
 ## [1.1.1](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.0...v1.1.1) (2026-09-16)
 
 
