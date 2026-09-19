@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.2...v1.1.3) (2026-09-19)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate futures to v0.3.34 ([#107](https://github.com/jrjohn/arcana-cloud-rust/issues/107)) ([0866124](https://github.com/jrjohn/arcana-cloud-rust/commit/0866124ed793718a23ceeb749f0e66859c2cec6e))
+
 ## [1.1.2](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.1...v1.1.2) (2026-09-18)
 
 
