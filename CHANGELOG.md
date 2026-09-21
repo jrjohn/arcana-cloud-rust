@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.5](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.4...v1.1.5) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate reqwest to v0.13.5 ([#112](https://github.com/jrjohn/arcana-cloud-rust/issues/112)) ([3d1e0d3](https://github.com/jrjohn/arcana-cloud-rust/commit/3d1e0d3c7626991ab7ab8682f7c957cb299b9aaa))
+* **deps:** update rust crate thiserror to v2.0.20 ([#113](https://github.com/jrjohn/arcana-cloud-rust/issues/113)) ([48cd23e](https://github.com/jrjohn/arcana-cloud-rust/commit/48cd23e7c536b387579ba85e44ab1db5fe1c36e4))
+
 ## [1.1.4](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.3...v1.1.4) (2026-09-21)
 
 
