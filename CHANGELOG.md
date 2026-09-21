@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.3...v1.1.4) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate http-body-util to v0.1.5 ([#108](https://github.com/jrjohn/arcana-cloud-rust/issues/108)) ([7db7ec4](https://github.com/jrjohn/arcana-cloud-rust/commit/7db7ec48c506df375eec80cee8ffc7556168de66))
+* **deps:** update rust crate hyper to v1.11.1 ([#110](https://github.com/jrjohn/arcana-cloud-rust/issues/110)) ([e082dec](https://github.com/jrjohn/arcana-cloud-rust/commit/e082deccdad574deeba5242637e2cd89113a7340))
+
 ## [1.1.3](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.2...v1.1.3) (2026-09-19)
 
 
