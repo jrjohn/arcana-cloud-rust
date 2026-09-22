@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.6](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.5...v1.1.6) (2026-09-22)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate toml to v1.1.6 ([#115](https://github.com/jrjohn/arcana-cloud-rust/issues/115)) ([c0fa650](https://github.com/jrjohn/arcana-cloud-rust/commit/c0fa650127eb310fc34f0b1aa542dfe83fc1c3bf))
+* **deps:** update rust crate tower-http to v0.7.1 ([#116](https://github.com/jrjohn/arcana-cloud-rust/issues/116)) ([a330b86](https://github.com/jrjohn/arcana-cloud-rust/commit/a330b86729237bd83ff2957c6ebe59d5d876407a))
+
 ## [1.1.5](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.4...v1.1.5) (2026-09-21)
 
 
