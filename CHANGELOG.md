@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.9](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.8...v1.1.9) (2026-09-24)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate thiserror to v2.0.21 ([#131](https://github.com/jrjohn/arcana-cloud-rust/issues/131)) ([9b6d713](https://github.com/jrjohn/arcana-cloud-rust/commit/9b6d713680ebe3799c93c4bbcae4f318a378d887))
+* **deps:** update utoipa monorepo ([930377b](https://github.com/jrjohn/arcana-cloud-rust/commit/930377be5ff07d94a35cf18dd1dce72afdb8d683))
+* **deps:** update utoipa monorepo (major) ([#130](https://github.com/jrjohn/arcana-cloud-rust/issues/130)) ([930377b](https://github.com/jrjohn/arcana-cloud-rust/commit/930377be5ff07d94a35cf18dd1dce72afdb8d683))
+
 ## [1.1.8](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.7...v1.1.8) (2026-09-24)
 
 
