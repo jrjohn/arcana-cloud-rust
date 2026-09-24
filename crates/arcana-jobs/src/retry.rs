@@ -147,7 +147,7 @@ impl RetryPolicy {
             RetryStrategy::None => 0,
             RetryStrategy::Fixed => self.initial_delay_ms,
             RetryStrategy::Exponential => {
-                let exp = (attempt - 1);
+                let exp = attempt - 1;
                 let delay = self.initial_delay_ms as f64 * self.multiplier.powi(exp as i32);
                 delay as u64
             }

@@ -21,3 +21,6 @@ shaku.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 tempfile = "3.14"
+
+[lints]
+workspace = true

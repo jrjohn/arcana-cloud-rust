@@ -140,8 +140,13 @@ arcana-jobs = { path = "crates/arcana-jobs" }
 unsafe_code = "warn"
 
 [workspace.lints.clippy]
-all = "warn"
-pedantic = "warn"
+# Enforced in CI (docker-compose.test.yml: cargo clippy ... -D warnings): every default
+# clippy lint (clippy::all) must be clean. Every crate opts in via `[lints] workspace = true`.
+all = { level = "warn", priority = -1 }
+# pedantic is NOT enforced yet: turning it on surfaced ~750 warnings (missing_errors_doc 186,
+# uninlined_format_args 125, must_use_candidate 95, ...). Adopt individual pedantic lints
+# one at a time, fixing the existing hits in the same PR, instead of flipping the group.
+pedantic = { level = "allow", priority = -1 }
 
 [profile.release]
 lto = true

@@ -54,15 +54,19 @@ impl UserRole {
         [Self::User, Self::Moderator, Self::Admin, Self::SuperAdmin]
     }
 
-    /// Parses a role from a string.
-    #[must_use]
-    pub fn from_str(s: &str) -> Option<Self> {
+}
+
+impl std::str::FromStr for UserRole {
+    type Err = String;
+
+    /// Parses a role from a string (case-insensitive, accepts common aliases).
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "user" => Some(Self::User),
-            "moderator" | "mod" => Some(Self::Moderator),
-            "admin" | "administrator" => Some(Self::Admin),
-            "superadmin" | "super_admin" | "superadministrator" => Some(Self::SuperAdmin),
-            _ => None,
+            "user" => Ok(Self::User),
+            "moderator" | "mod" => Ok(Self::Moderator),
+            "admin" | "administrator" => Ok(Self::Admin),
+            "superadmin" | "super_admin" | "superadministrator" => Ok(Self::SuperAdmin),
+            _ => Err(format!("unknown role: {s}")),
         }
     }
 }
@@ -250,13 +254,13 @@ mod tests {
 
     #[test]
     fn test_role_from_str() {
-        assert_eq!(UserRole::from_str("user"), Some(UserRole::User));
-        assert_eq!(UserRole::from_str("moderator"), Some(UserRole::Moderator));
-        assert_eq!(UserRole::from_str("mod"), Some(UserRole::Moderator));
-        assert_eq!(UserRole::from_str("admin"), Some(UserRole::Admin));
-        assert_eq!(UserRole::from_str("superadmin"), Some(UserRole::SuperAdmin));
-        assert_eq!(UserRole::from_str("super_admin"), Some(UserRole::SuperAdmin));
-        assert_eq!(UserRole::from_str("unknown"), None);
+        assert_eq!("user".parse::<UserRole>().ok(), Some(UserRole::User));
+        assert_eq!("moderator".parse::<UserRole>().ok(), Some(UserRole::Moderator));
+        assert_eq!("mod".parse::<UserRole>().ok(), Some(UserRole::Moderator));
+        assert_eq!("admin".parse::<UserRole>().ok(), Some(UserRole::Admin));
+        assert_eq!("superadmin".parse::<UserRole>().ok(), Some(UserRole::SuperAdmin));
+        assert_eq!("super_admin".parse::<UserRole>().ok(), Some(UserRole::SuperAdmin));
+        assert_eq!("unknown".parse::<UserRole>().ok(), None);
     }
 
     #[test]

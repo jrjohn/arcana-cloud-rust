@@ -34,3 +34,6 @@ openapi = ["dep:utoipa"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true
