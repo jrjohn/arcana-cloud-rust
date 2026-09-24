@@ -15,8 +15,11 @@ services:
     # After the tests, run clippy over the same scope (--lib --bins) and write the JSON
     # report SonarQube imports. Same container, so the debug artifacts cargo test just
     # built are reused and clippy only re-checks the workspace crates (~1-2 min) instead
-    # of recompiling ~400 dependencies. Clippy never changes the build result: its exit
-    # code is dropped and the test exit code is what propagates.
+    # of recompiling ~400 dependencies.
+    # Clippy is a gate: the lint levels live in Cargo.toml [workspace.lints] (clippy::all
+    # enforced, pedantic not yet), and a second, cached pass with -D warnings fails the
+    # build on any warning. The report is still written first so SonarQube gets it even
+    # when the gate fails. Test failures take precedence in the exit code.
     command:
       - sh
       - -c
@@ -26,7 +29,12 @@ services:
         cargo clippy --workspace --lib --bins --message-format=json \
           > /app/clippy-report.json 2> /app/clippy-stderr.txt || true
         echo "clippy report: $$(wc -l < /app/clippy-report.json) json lines"
-        exit $$RC
+        cargo clippy --workspace --lib --bins -- -D warnings > /app/clippy-gate.txt 2>&1
+        CLIPPY_RC=$$?
+        tail -40 /app/clippy-gate.txt
+        if [ "$$CLIPPY_RC" -ne 0 ]; then echo "CLIPPY GATE FAILED: fix the warnings above (lint levels in Cargo.toml [workspace.lints])"; fi
+        [ "$$RC" -ne 0 ] && exit $$RC
+        exit $$CLIPPY_RC
 
   coverage:
     # ARM64-native: cargo-llvm-cov (tarpaulin is x86_64 only)

@@ -264,7 +264,7 @@ impl JobStatusTracker {
         }
 
         // Sort by timestamp descending
-        activities.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        activities.sort_by_key(|a| std::cmp::Reverse(a.timestamp));
         activities.truncate(limit);
 
         Ok(activities)

@@ -16,3 +16,6 @@ uuid.workspace = true
 default = ["host"]
 host = []
 wasm = []
+
+[lints]
+workspace = true

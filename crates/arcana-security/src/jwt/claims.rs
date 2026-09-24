@@ -84,6 +84,10 @@ impl Claims {
 
     /// Creates new refresh token claims.
     #[must_use]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one argument per JWT claim; a builder would only move the same list elsewhere"
+    )]
     pub fn new_refresh(
         user_id: UserId,
         username: String,

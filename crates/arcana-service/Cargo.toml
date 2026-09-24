@@ -26,3 +26,6 @@ deadpool-redis.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 mockall.workspace = true
+
+[lints]
+workspace = true
