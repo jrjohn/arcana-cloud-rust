@@ -4,8 +4,8 @@
 //!
 //! Supports multiple deployment modes:
 //! - **Monolithic**: All layers in a single process
-//! - **LayeredGrpc**: Distributed layers with gRPC communication
-//! - **LayeredHttp**: Distributed layers with HTTP communication
+//! - **`LayeredGrpc`**: Distributed layers with gRPC communication
+//! - **`LayeredHttp`**: Distributed layers with HTTP communication
 
 use arcana_config::{AppConfig, ConfigLoader, DeploymentLayer, DeploymentMode};
 use arcana_core::ArcanaResult;
@@ -28,7 +28,7 @@ async fn main() {
         Err(e) => {
             // Fall back to basic logging if config fails
             init_basic_logging();
-            eprintln!("Failed to load configuration: {}", e);
+            eprintln!("Failed to load configuration: {e}");
             std::process::exit(1);
         }
     };
@@ -36,7 +36,7 @@ async fn main() {
     // Initialize telemetry/logging based on config
     if let Err(e) = init_telemetry(&config) {
         init_basic_logging();
-        eprintln!("Failed to initialize telemetry: {}", e);
+        eprintln!("Failed to initialize telemetry: {e}");
     }
 
     info!("Starting Arcana Cloud Rust Server...");
@@ -183,7 +183,7 @@ async fn run_monolithic(config: AppConfig, jobs_config: JobsConfig) -> ArcanaRes
 
     let listener = tokio::net::TcpListener::bind(&rest_addr)
         .await
-        .map_err(|e| arcana_core::ArcanaError::Internal(format!("Failed to bind REST: {}", e)))?;
+        .map_err(|e| arcana_core::ArcanaError::Internal(format!("Failed to bind REST: {e}")))?;
 
     // Create gRPC server
     let grpc_server = arcana_grpc::GrpcServer::new(&config.server, user_service, auth_service)?;
@@ -195,7 +195,7 @@ async fn run_monolithic(config: AppConfig, jobs_config: JobsConfig) -> ArcanaRes
     // Run both servers concurrently
     let result = tokio::select! {
         result = axum::serve(listener, router).with_graceful_shutdown(shutdown_signal()) => {
-            result.map_err(|e| arcana_core::ArcanaError::Internal(format!("REST server error: {}", e)))
+            result.map_err(|e| arcana_core::ArcanaError::Internal(format!("REST server error: {e}")))
         }
         result = grpc_server.serve() => {
             result
@@ -238,7 +238,7 @@ async fn run_controller_layer_grpc(config: AppConfig) -> ArcanaResult<()> {
     // Create REST router with state and token provider
     // Note: For controller layer, we use the legacy AppState approach
     // since we're using remote services rather than a Shaku module
-    let router = create_router_legacy(app_state, token_provider, &config.server);
+    let router = create_router_legacy(&app_state, token_provider, &config.server);
 
     // Start REST server only (controller doesn't expose gRPC)
     let rest_addr = config.server.rest_addr();
@@ -246,12 +246,12 @@ async fn run_controller_layer_grpc(config: AppConfig) -> ArcanaResult<()> {
 
     let listener = tokio::net::TcpListener::bind(&rest_addr)
         .await
-        .map_err(|e| arcana_core::ArcanaError::Internal(format!("Failed to bind REST: {}", e)))?;
+        .map_err(|e| arcana_core::ArcanaError::Internal(format!("Failed to bind REST: {e}")))?;
 
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .map_err(|e| arcana_core::ArcanaError::Internal(format!("REST server error: {}", e)))?;
+        .map_err(|e| arcana_core::ArcanaError::Internal(format!("REST server error: {e}")))?;
 
     info!("Controller layer shutdown complete");
     Ok(())
@@ -338,9 +338,9 @@ async fn run_repository_layer(config: AppConfig) -> ArcanaResult<()> {
     Ok(())
 }
 
-/// Creates a REST router using legacy AppState (for controller layer with remote services).
+/// Creates a REST router using legacy `AppState` (for controller layer with remote services).
 fn create_router_legacy(
-    state: arcana_rest::AppState,
+    state: &arcana_rest::AppState,
     token_provider: std::sync::Arc<dyn arcana_security::TokenProviderInterface>,
     server_config: &arcana_config::ServerConfig,
 ) -> axum::Router {

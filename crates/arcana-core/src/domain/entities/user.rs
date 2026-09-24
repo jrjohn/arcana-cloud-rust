@@ -101,7 +101,7 @@ impl User {
     #[must_use]
     pub fn full_name(&self) -> Option<String> {
         match (&self.first_name, &self.last_name) {
-            (Some(first), Some(last)) => Some(format!("{} {}", first, last)),
+            (Some(first), Some(last)) => Some(format!("{first} {last}")),
             (Some(first), None) => Some(first.clone()),
             (None, Some(last)) => Some(last.clone()),
             (None, None) => None,
@@ -256,7 +256,7 @@ impl UserBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if username, email, or password_hash are not set.
+    /// Panics if username, email, or `password_hash` are not set.
     #[must_use]
     pub fn build(self) -> User {
         let mut user = User::new(

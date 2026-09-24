@@ -931,6 +931,39 @@ arcana-cloud-rust/
 
 ---
 
+## Coding Standard
+
+Clippy is part of the build, not a report. The rules live in `Cargo.toml` under `[workspace.lints]`, and every crate opts in with `[lints] workspace = true`.
+
+| Lint group | Level | Enforced by |
+|---|---|---|
+| `clippy::all` (default lints) | warn | CI: `cargo clippy --workspace --lib --bins -- -D warnings` |
+| `clippy::pedantic` | warn | same command — any warning fails the build |
+| `unsafe_code` | warn | same command |
+
+Run it locally before pushing:
+
+```bash
+cargo clippy --workspace --lib --bins -- -D warnings
+```
+
+**Exceptions**
+
+- Allow a lint only on the smallest item that needs it (one function, statement or struct), and always give a reason:
+  ```rust
+  #[allow(clippy::cast_precision_loss, reason = "Redis sorted-set scores are f64; ms timestamps stay exact up to 2^53")]
+  ```
+- Never allow a lint for a whole module or crate, and never lower a level in `Cargo.toml` to get a build green.
+- The only module-level allows are for code we do not write: tonic-build output (`arcana-grpc/src/proto/mod.rs`) and shaku `module!` expansions (`arcana-server/src/di.rs`).
+
+**What the pedantic lints ask for**
+
+- Every public function that returns `Result` documents its failures in a `# Errors` section, and every function that can panic has a `# Panics` section. Write them from the code, not as filler.
+- Numeric `as` casts that can truncate, wrap or lose sign (`cast_possible_truncation`, `cast_possible_wrap`, `cast_sign_loss`) use `TryFrom` or an explicit saturating conversion instead. Silent wrap-around is a bug.
+- Builders and pure functions whose result must be used are `#[must_use]`.
+
+SonarQube also imports the Clippy JSON report (`sonar.rust.clippyReport.reportPaths`), so the same findings show up there.
+
 ## Testing
 
 ### Test Summary

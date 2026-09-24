@@ -1,4 +1,4 @@
-//! OpenAPI documentation configuration.
+//! `OpenAPI` documentation configuration.
 //!
 //! This module provides OpenAPI/Swagger documentation generation for the REST API.
 
@@ -12,7 +12,7 @@ use arcana_service::{
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
-/// OpenAPI documentation for Arcana Cloud Rust API.
+/// `OpenAPI` documentation for Arcana Cloud Rust API.
 #[derive(OpenApi)]
 #[openapi(
     info(

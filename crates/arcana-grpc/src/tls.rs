@@ -11,6 +11,10 @@ use tracing::{debug, info};
 
 /// Builder for TLS configuration from security config.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "fields hold file paths; the `_path` suffix distinguishes them from the PEM contents read from them"
+)]
 pub struct TlsConfigBuilder {
     cert_path: String,
     key_path: String,
@@ -21,6 +25,11 @@ impl TlsConfigBuilder {
     /// Creates a TLS config builder from security configuration.
     ///
     /// Returns None if TLS is disabled, or Some(builder) if enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if TLS is enabled but `tls_cert_path` or
+    /// `tls_key_path` is not set.
     pub fn from_security_config(config: &SecurityConfig) -> ArcanaResult<Option<Self>> {
         if !config.grpc_tls_enabled {
             debug!("gRPC TLS is disabled");
@@ -65,6 +74,11 @@ impl TlsConfigBuilder {
     }
 
     /// Builds the server TLS configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if the certificate, private key or (when set)
+    /// CA certificate file cannot be read.
     pub fn build_server_config(&self) -> ArcanaResult<ServerTlsConfig> {
         let cert = read_file(&self.cert_path, "TLS certificate")?;
         let key = read_file(&self.key_path, "TLS private key")?;
@@ -89,6 +103,11 @@ impl TlsConfigBuilder {
     ///
     /// For client connections, only the CA certificate is needed to verify
     /// the server. The cert and key are used for mutual TLS (mTLS).
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if the CA certificate file (`cert_path`) cannot be
+    /// read, or, in the mutual-TLS case, if the client certificate or client key cannot be read.
     pub fn build_client_config(&self) -> ArcanaResult<ClientTlsConfig> {
         // For client, the cert_path is typically the CA cert to verify server
         let ca_cert = read_file(&self.cert_path, "CA certificate")?;
@@ -111,6 +130,10 @@ impl TlsConfigBuilder {
     }
 
     /// Builds a simple client TLS config that just trusts the given CA.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if the CA certificate file cannot be read.
     pub fn build_simple_client_config(&self) -> ArcanaResult<ClientTlsConfig> {
         let ca_cert = read_file(&self.cert_path, "CA certificate")?;
         let config = ClientTlsConfig::new().ca_certificate(Certificate::from_pem(ca_cert));
@@ -123,6 +146,10 @@ impl TlsConfigBuilder {
 ///
 /// This is a convenience function when you only need to configure the CA certificate
 /// for server verification, without mutual TLS.
+///
+/// # Errors
+///
+/// Returns `ArcanaError::Configuration` if the file at `ca_cert_path` cannot be read.
 pub fn build_client_tls_from_ca(ca_cert_path: &str) -> ArcanaResult<ClientTlsConfig> {
     let ca_cert = read_file(ca_cert_path, "CA certificate")?;
     let config = ClientTlsConfig::new().ca_certificate(Certificate::from_pem(ca_cert));
@@ -132,6 +159,11 @@ pub fn build_client_tls_from_ca(ca_cert_path: &str) -> ArcanaResult<ClientTlsCon
 /// Builds a client TLS config from security configuration.
 ///
 /// Returns None if TLS is disabled.
+///
+/// # Errors
+///
+/// Returns `ArcanaError::Configuration` if TLS is enabled but `tls_cert_path` is not set,
+/// or if the CA certificate file cannot be read.
 pub fn build_client_tls_from_config(config: &SecurityConfig) -> ArcanaResult<Option<ClientTlsConfig>> {
     if !config.grpc_tls_enabled {
         return Ok(None);
@@ -152,8 +184,7 @@ pub fn build_client_tls_from_config(config: &SecurityConfig) -> ArcanaResult<Opt
 fn read_file(path: &str, description: &str) -> ArcanaResult<Vec<u8>> {
     fs::read(path).map_err(|e| {
         arcana_core::ArcanaError::Configuration(format!(
-            "Failed to read {} from '{}': {}",
-            description, path, e
+            "Failed to read {description} from '{path}': {e}"
         ))
     })
 }

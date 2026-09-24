@@ -35,11 +35,21 @@ pub struct RenderResponse {
 
 impl SsrEngine {
     /// Creates a new SSR engine.
+    #[must_use]
     pub fn new(config: SsrConfig) -> Self {
         Self { config }
     }
 
     /// Initializes the SSR engine.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error: runtime-pool setup is not implemented yet.
+    /// The `Result` is kept for when loading JS runtimes and bundles can fail.
+    #[allow(
+        clippy::unused_async,
+        reason = "public async API kept stable; the real runtime-pool setup will await"
+    )]
     pub async fn initialize(&self) -> ArcanaResult<()> {
         if !self.config.enabled {
             info!("SSR engine is disabled");
@@ -60,6 +70,15 @@ impl SsrEngine {
     }
 
     /// Renders a component to HTML.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`arcana_core::ArcanaError::SsrRendering`] if SSR is disabled in
+    /// the configuration.
+    #[allow(
+        clippy::unused_async,
+        reason = "public async API kept stable; the real render will await a pooled JS runtime"
+    )]
     pub async fn render(&self, request: RenderRequest) -> ArcanaResult<RenderResponse> {
         if !self.config.enabled {
             return Err(arcana_core::ArcanaError::SsrRendering(
@@ -84,6 +103,7 @@ impl SsrEngine {
     }
 
     /// Checks if SSR is enabled.
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.config.enabled
     }

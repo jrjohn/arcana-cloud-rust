@@ -32,6 +32,7 @@ impl Default for RetryPolicy {
 
 impl RetryPolicy {
     /// Creates a new retry policy with the specified max attempts.
+    #[must_use]
     pub fn with_max_attempts(max_attempts: u32) -> Self {
         Self {
             max_attempts,
@@ -40,12 +41,23 @@ impl RetryPolicy {
     }
 
     /// Calculates the delay for a given attempt number.
+    #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "delays are in milliseconds, far below f64's 2^53 exact-integer range; \
+                  the f64 -> u64 `as` casts saturate (negative/NaN -> 0) and truncating \
+                  to whole milliseconds is intended"
+    )]
     pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
         if attempt == 0 {
             return Duration::ZERO;
         }
 
-        let base_delay = self.initial_delay.as_millis() as f64 * self.multiplier.powi(attempt as i32 - 1);
+        // Exponents beyond i32::MAX saturate; the delay is capped by `max_delay` anyway.
+        let exponent = i32::try_from(attempt - 1).unwrap_or(i32::MAX);
+        let base_delay = self.initial_delay.as_millis() as f64 * self.multiplier.powi(exponent);
         let delay = Duration::from_millis(base_delay.min(self.max_delay.as_millis() as f64) as u64);
 
         if self.jitter {
@@ -58,6 +70,16 @@ impl RetryPolicy {
     }
 
     /// Executes a function with retry logic.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error from the last attempt if all `max_attempts` calls of
+    /// `f` fail.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_attempts` is 0, since no attempt is made and there is no
+    /// error to return.
     pub async fn execute<F, Fut, T, E>(&self, mut f: F) -> Result<T, E>
     where
         F: FnMut() -> Fut,
@@ -93,7 +115,7 @@ fn rand_simple() -> f64 {
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .subsec_nanos();
-    (nanos % 1000) as f64 / 1000.0
+    f64::from(nanos % 1000) / 1000.0
 }
 
 #[cfg(test)]

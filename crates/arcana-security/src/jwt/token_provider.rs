@@ -4,7 +4,7 @@ use super::Claims;
 use arcana_config::SecurityConfig;
 use arcana_core::{ArcanaError, ArcanaResult, Interface, UserId};
 use arcana_core::UserRole;
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use shaku::Component;
 use std::sync::Arc;
@@ -25,11 +25,31 @@ pub struct TokenPair {
     pub token_type: String,
 }
 
+/// Computes `now + secs`, rejecting lifetimes that do not fit in a
+/// `chrono::Duration` / `DateTime<Utc>` instead of wrapping or panicking.
+fn expiry_from_now(secs: u64, kind: &str) -> ArcanaResult<DateTime<Utc>> {
+    i64::try_from(secs)
+        .ok()
+        .and_then(Duration::try_seconds)
+        .and_then(|lifetime| Utc::now().checked_add_signed(lifetime))
+        .ok_or_else(|| {
+            ArcanaError::Configuration(format!(
+                "JWT {kind} token lifetime of {secs}s is out of range"
+            ))
+        })
+}
+
 /// Interface for JWT token operations.
 ///
 /// This trait abstracts token generation and validation for dependency injection.
 pub trait TokenProviderInterface: Interface + Send + Sync {
     /// Generates a token pair for a user.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if a configured token lifetime is
+    /// too large to represent as an expiry timestamp, and
+    /// [`ArcanaError::Internal`] if encoding either token fails.
     fn generate_tokens(
         &self,
         user_id: UserId,
@@ -39,18 +59,45 @@ pub trait TokenProviderInterface: Interface + Send + Sync {
     ) -> ArcanaResult<TokenPair>;
 
     /// Validates a token and returns the claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::TokenExpired`] if the token has expired, and
+    /// [`ArcanaError::InvalidToken`] if the signature, issuer, audience or any
+    /// other part of the token fails validation.
     fn validate_token(&self, token: &str) -> ArcanaResult<Claims>;
 
     /// Validates an access token specifically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as `validate_token`, plus
+    /// [`ArcanaError::InvalidToken`] if the token is valid but is not an access token.
     fn validate_access_token(&self, token: &str) -> ArcanaResult<Claims>;
 
     /// Validates a refresh token specifically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as `validate_token`, plus
+    /// [`ArcanaError::InvalidToken`] if the token is valid but is not a refresh token.
     fn validate_refresh_token(&self, token: &str) -> ArcanaResult<Claims>;
 
     /// Refreshes a token pair using a refresh token.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of `validate_refresh_token` if the refresh token is
+    /// invalid, [`ArcanaError::InvalidToken`] if its claims carry no user
+    /// ID, and the errors of `generate_tokens` if issuing the new pair fails.
     fn refresh_tokens(&self, refresh_token: &str) -> ArcanaResult<TokenPair>;
 
     /// Decodes a token without validation (for inspection).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::InvalidToken`] if the token is malformed or its
+    /// claims cannot be deserialized. The signature is not checked.
     fn decode_without_validation(&self, token: &str) -> ArcanaResult<Claims>;
 }
 
@@ -110,6 +157,12 @@ impl TokenProvider {
     }
 
     /// Generates a token pair for a user.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if a configured token lifetime is
+    /// too large to represent as an expiry timestamp, and
+    /// [`ArcanaError::Internal`] if encoding either token fails.
     pub fn generate_tokens(
         &self,
         user_id: UserId,
@@ -122,8 +175,10 @@ impl TokenProvider {
         let access_token = self.generate_access_token(user_id, username, email, role)?;
         let refresh_token = self.generate_refresh_token(user_id, username, email, role, &session_id)?;
 
-        let access_expires_at = (Utc::now() + Duration::seconds(self.config.jwt_access_expiration_secs as i64)).timestamp();
-        let refresh_expires_at = (Utc::now() + Duration::seconds(self.config.jwt_refresh_expiration_secs as i64)).timestamp();
+        let access_expires_at =
+            expiry_from_now(self.config.jwt_access_expiration_secs, "access")?.timestamp();
+        let refresh_expires_at =
+            expiry_from_now(self.config.jwt_refresh_expiration_secs, "refresh")?.timestamp();
 
         Ok(TokenPair {
             access_token,
@@ -135,6 +190,12 @@ impl TokenProvider {
     }
 
     /// Generates an access token.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if the configured access-token
+    /// lifetime is too large to represent, and [`ArcanaError::Internal`] if
+    /// JWT encoding fails.
     pub fn generate_access_token(
         &self,
         user_id: UserId,
@@ -142,7 +203,7 @@ impl TokenProvider {
         email: &str,
         role: UserRole,
     ) -> ArcanaResult<String> {
-        let expires_at = Utc::now() + Duration::seconds(self.config.jwt_access_expiration_secs as i64);
+        let expires_at = expiry_from_now(self.config.jwt_access_expiration_secs, "access")?;
 
         let claims = Claims::new_access(
             user_id,
@@ -155,13 +216,19 @@ impl TokenProvider {
         );
 
         let token = encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| ArcanaError::Internal(format!("Failed to generate access token: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to generate access token: {e}")))?;
 
         debug!("Generated access token for user {}", user_id);
         Ok(token)
     }
 
     /// Generates a refresh token.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if the configured refresh-token
+    /// lifetime is too large to represent, and [`ArcanaError::Internal`] if
+    /// JWT encoding fails.
     pub fn generate_refresh_token(
         &self,
         user_id: UserId,
@@ -170,7 +237,7 @@ impl TokenProvider {
         role: UserRole,
         session_id: &str,
     ) -> ArcanaResult<String> {
-        let expires_at = Utc::now() + Duration::seconds(self.config.jwt_refresh_expiration_secs as i64);
+        let expires_at = expiry_from_now(self.config.jwt_refresh_expiration_secs, "refresh")?;
 
         let claims = Claims::new_refresh(
             user_id,
@@ -184,13 +251,19 @@ impl TokenProvider {
         );
 
         let token = encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| ArcanaError::Internal(format!("Failed to generate refresh token: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to generate refresh token: {e}")))?;
 
         debug!("Generated refresh token for user {}", user_id);
         Ok(token)
     }
 
     /// Validates a token and returns the claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::TokenExpired`] if the token has expired, and
+    /// [`ArcanaError::InvalidToken`] if the signature, issuer, audience or any
+    /// other part of the token fails validation.
     pub fn validate_token(&self, token: &str) -> ArcanaResult<Claims> {
         let token_data = decode::<Claims>(token, &self.decoding_key, &self.validation)
             .map_err(|e| {
@@ -215,6 +288,11 @@ impl TokenProvider {
     }
 
     /// Validates an access token specifically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as `validate_token`, plus
+    /// [`ArcanaError::InvalidToken`] if the token is valid but is not an access token.
     pub fn validate_access_token(&self, token: &str) -> ArcanaResult<Claims> {
         let claims = self.validate_token(token)?;
 
@@ -226,6 +304,11 @@ impl TokenProvider {
     }
 
     /// Validates a refresh token specifically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as `validate_token`, plus
+    /// [`ArcanaError::InvalidToken`] if the token is valid but is not a refresh token.
     pub fn validate_refresh_token(&self, token: &str) -> ArcanaResult<Claims> {
         let claims = self.validate_token(token)?;
 
@@ -237,6 +320,12 @@ impl TokenProvider {
     }
 
     /// Refreshes a token pair using a refresh token.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of `validate_refresh_token` if the refresh token is
+    /// invalid, [`ArcanaError::InvalidToken`] if its claims carry no user
+    /// ID, and the errors of `generate_tokens` if issuing the new pair fails.
     pub fn refresh_tokens(&self, refresh_token: &str) -> ArcanaResult<TokenPair> {
         let claims = self.validate_refresh_token(refresh_token)?;
 
@@ -248,6 +337,11 @@ impl TokenProvider {
     }
 
     /// Decodes a token without validation (for inspection).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::InvalidToken`] if the token is malformed or its
+    /// claims cannot be deserialized. The signature is not checked.
     pub fn decode_without_validation(&self, token: &str) -> ArcanaResult<Claims> {
         // jsonwebtoken 11 removed `Validation::insecure_disable_signature_validation`
         // in favour of an explicitly named entry point. This decodes the claims
@@ -282,8 +376,10 @@ impl TokenProviderInterface for TokenProvider {
         let access_token = self.generate_access_token(user_id, username, email, role)?;
         let refresh_token = self.generate_refresh_token(user_id, username, email, role, &session_id)?;
 
-        let access_expires_at = (Utc::now() + Duration::seconds(self.config.jwt_access_expiration_secs as i64)).timestamp();
-        let refresh_expires_at = (Utc::now() + Duration::seconds(self.config.jwt_refresh_expiration_secs as i64)).timestamp();
+        let access_expires_at =
+            expiry_from_now(self.config.jwt_access_expiration_secs, "access")?.timestamp();
+        let refresh_expires_at =
+            expiry_from_now(self.config.jwt_refresh_expiration_secs, "refresh")?.timestamp();
 
         Ok(TokenPair {
             access_token,

@@ -24,11 +24,16 @@ pub struct RemoteUserRepository {
 
 impl RemoteUserRepository {
     /// Creates a new remote repository client.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Internal` if the gRPC channel to `addr` cannot be established
+    /// (invalid URI or connection failure).
     pub async fn connect(addr: &str) -> ArcanaResult<Self> {
         info!("Connecting to repository service at {} (no TLS)", addr);
         let client = repository::repository_service_client::RepositoryServiceClient::connect(addr.to_string())
             .await
-            .map_err(|e| ArcanaError::Internal(format!("Failed to connect to repository service: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to connect to repository service: {e}")))?;
 
         Ok(Self { client })
     }
@@ -36,26 +41,32 @@ impl RemoteUserRepository {
     /// Creates a new remote repository client with TLS configuration.
     ///
     /// If TLS is disabled in the security config, connects without TLS.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if TLS is enabled but `tls_cert_path` is unset or
+    /// the CA certificate cannot be read, if `addr` is not a valid endpoint URI, or if the TLS
+    /// settings cannot be applied; returns `ArcanaError::Internal` if the connection fails.
     pub async fn connect_with_tls(addr: &str, security_config: &SecurityConfig) -> ArcanaResult<Self> {
         let tls_config = build_client_tls_from_config(security_config)?;
 
         let endpoint = Endpoint::try_from(addr.to_string())
-            .map_err(|e| ArcanaError::Configuration(format!("Invalid endpoint address: {}", e)))?;
+            .map_err(|e| ArcanaError::Configuration(format!("Invalid endpoint address: {e}")))?;
 
         let channel = if let Some(tls) = tls_config {
             info!("Connecting to repository service at {} with TLS", addr);
             endpoint
                 .tls_config(tls)
-                .map_err(|e| ArcanaError::Configuration(format!("Failed to configure TLS: {}", e)))?
+                .map_err(|e| ArcanaError::Configuration(format!("Failed to configure TLS: {e}")))?
                 .connect()
                 .await
-                .map_err(|e| ArcanaError::Internal(format!("Failed to connect with TLS: {}", e)))?
+                .map_err(|e| ArcanaError::Internal(format!("Failed to connect with TLS: {e}")))?
         } else {
             info!("Connecting to repository service at {} (no TLS)", addr);
             endpoint
                 .connect()
                 .await
-                .map_err(|e| ArcanaError::Internal(format!("Failed to connect: {}", e)))?
+                .map_err(|e| ArcanaError::Internal(format!("Failed to connect: {e}")))?
         };
 
         Ok(Self {
@@ -64,6 +75,7 @@ impl RemoteUserRepository {
     }
 
     /// Creates from an existing channel.
+    #[must_use]
     pub fn from_channel(channel: Channel) -> Self {
         Self {
             client: repository::repository_service_client::RepositoryServiceClient::new(channel),
@@ -96,7 +108,7 @@ impl UserRepository for RemoteUserRepository {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -111,7 +123,7 @@ impl UserRepository for RemoteUserRepository {
                 username: username.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -126,7 +138,7 @@ impl UserRepository for RemoteUserRepository {
                 email: email.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -141,7 +153,7 @@ impl UserRepository for RemoteUserRepository {
                 identifier: identifier.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -156,7 +168,7 @@ impl UserRepository for RemoteUserRepository {
                 username: username.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().exists)
     }
@@ -171,7 +183,7 @@ impl UserRepository for RemoteUserRepository {
                 email: email.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().exists)
     }
@@ -184,12 +196,12 @@ impl UserRepository for RemoteUserRepository {
             .clone()
             .find_all_users(repository::FindAllUsersRequest {
                 page: Some(common::PageRequest {
-                    page: page.page as i32,
-                    size: page.size as i32,
+                    page: i32::try_from(page.page).unwrap_or(i32::MAX),
+                    size: i32::try_from(page.size).unwrap_or(i32::MAX),
                 }),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let inner = response.into_inner();
         let page_info = inner.page_info.unwrap_or_default();
@@ -197,9 +209,9 @@ impl UserRepository for RemoteUserRepository {
 
         Ok(Page::new(
             users,
-            page_info.page as usize,
-            page_info.size as usize,
-            page_info.total_elements as u64,
+            usize::try_from(page_info.page).unwrap_or(0),
+            usize::try_from(page_info.size).unwrap_or(0),
+            u64::try_from(page_info.total_elements).unwrap_or(0),
         ))
     }
 
@@ -212,12 +224,12 @@ impl UserRepository for RemoteUserRepository {
             .find_users_by_role(repository::FindUsersByRoleRequest {
                 role: to_proto_role(role) as i32,
                 page: Some(common::PageRequest {
-                    page: page.page as i32,
-                    size: page.size as i32,
+                    page: i32::try_from(page.page).unwrap_or(i32::MAX),
+                    size: i32::try_from(page.size).unwrap_or(i32::MAX),
                 }),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let inner = response.into_inner();
         let page_info = inner.page_info.unwrap_or_default();
@@ -225,9 +237,9 @@ impl UserRepository for RemoteUserRepository {
 
         Ok(Page::new(
             users,
-            page_info.page as usize,
-            page_info.size as usize,
-            page_info.total_elements as u64,
+            usize::try_from(page_info.page).unwrap_or(0),
+            usize::try_from(page_info.size).unwrap_or(0),
+            u64::try_from(page_info.total_elements).unwrap_or(0),
         ))
     }
 
@@ -241,7 +253,7 @@ impl UserRepository for RemoteUserRepository {
                 user: Some(to_proto_user_data(user)),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let saved = response
             .into_inner()
@@ -261,7 +273,7 @@ impl UserRepository for RemoteUserRepository {
                 user: Some(to_proto_user_data(user)),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let updated = response
             .into_inner()
@@ -281,7 +293,7 @@ impl UserRepository for RemoteUserRepository {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().deleted)
     }
@@ -294,7 +306,7 @@ impl UserRepository for RemoteUserRepository {
             .clone()
             .count_users(repository::CountUsersRequest {})
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().count)
     }
@@ -309,19 +321,29 @@ impl UserRepository for RemoteUserRepository {
                 role: to_proto_role(role) as i32,
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().count)
     }
 }
 
 /// Creates a shareable remote user repository.
+///
+/// # Errors
+///
+/// Returns `ArcanaError::Internal` if the gRPC channel to `addr` cannot be established.
 pub async fn create_remote_user_repository(addr: &str) -> ArcanaResult<Arc<dyn UserRepository>> {
     let client = RemoteUserRepository::connect(addr).await?;
     Ok(Arc::new(client))
 }
 
 /// Creates a shareable remote user repository with TLS support.
+///
+/// # Errors
+///
+/// Same conditions as [`RemoteUserRepository::connect_with_tls`]: `ArcanaError::Configuration`
+/// for missing/unreadable TLS material or an invalid address, `ArcanaError::Internal` if the
+/// connection fails.
 pub async fn create_remote_user_repository_with_tls(
     addr: &str,
     security_config: &SecurityConfig,
@@ -332,7 +354,7 @@ pub async fn create_remote_user_repository_with_tls(
 
 // Helper functions
 
-fn map_grpc_error(status: tonic::Status) -> ArcanaError {
+fn map_grpc_error(status: &tonic::Status) -> ArcanaError {
     match status.code() {
         tonic::Code::NotFound => ArcanaError::NotFound {
             resource_type: "Resource",
@@ -355,19 +377,19 @@ fn from_proto_user_data(user: &repository::UserData) -> User {
     let created_at = user
         .created_at
         .as_ref()
-        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
+        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, u32::try_from(t.nanos).ok()?))
         .unwrap_or_else(chrono::Utc::now);
 
     let updated_at = user
         .updated_at
         .as_ref()
-        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
+        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, u32::try_from(t.nanos).ok()?))
         .unwrap_or_else(chrono::Utc::now);
 
     let last_login_at = user
         .last_login_at
         .as_ref()
-        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32));
+        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, u32::try_from(t.nanos).ok()?));
 
     User {
         id,
@@ -400,15 +422,15 @@ fn to_proto_user_data(user: &User) -> repository::UserData {
         avatar_url: user.avatar_url.clone(),
         last_login_at: user.last_login_at.map(|dt| common::Timestamp {
             seconds: dt.timestamp(),
-            nanos: dt.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(dt.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
         created_at: Some(common::Timestamp {
             seconds: user.created_at.timestamp(),
-            nanos: user.created_at.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(user.created_at.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
         updated_at: Some(common::Timestamp {
             seconds: user.updated_at.timestamp(),
-            nanos: user.updated_at.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(user.updated_at.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
     }
 }

@@ -20,15 +20,21 @@ pub struct RemoteAuthServiceClient {
 
 impl RemoteAuthServiceClient {
     /// Creates a new remote auth service client.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Internal` if the gRPC channel to `addr` cannot be established
+    /// (invalid URI or connection failure).
     pub async fn connect(addr: &str) -> ArcanaResult<Self> {
         let client = auth::auth_service_client::AuthServiceClient::connect(addr.to_string())
             .await
-            .map_err(|e| ArcanaError::Internal(format!("Failed to connect to auth service: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to connect to auth service: {e}")))?;
 
         Ok(Self { client })
     }
 
     /// Creates from an existing channel.
+    #[must_use]
     pub fn from_channel(channel: Channel) -> Self {
         Self {
             client: auth::auth_service_client::AuthServiceClient::new(channel),
@@ -54,7 +60,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .register(proto_request)
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(from_proto_auth_response(response.into_inner()))
     }
@@ -73,7 +79,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .login(proto_request)
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(from_proto_auth_response(response.into_inner()))
     }
@@ -90,7 +96,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .refresh_token(proto_request)
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(from_proto_auth_response(response.into_inner()))
     }
@@ -107,7 +113,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .validate_token(proto_request)
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let inner = response.into_inner();
 
@@ -127,8 +133,7 @@ impl AuthService for RemoteAuthServiceClient {
         let email = String::new();
         let role = inner
             .role
-            .map(|r| from_proto_role(user_proto::UserRole::try_from(r).unwrap_or(user_proto::UserRole::User)))
-            .unwrap_or(arcana_core::UserRole::User);
+            .map_or(arcana_core::UserRole::User, |r| from_proto_role(user_proto::UserRole::try_from(r).unwrap_or(user_proto::UserRole::User)));
         let expires_at = inner.expires_at.unwrap_or(0);
 
         Ok(Claims::new_access(
@@ -151,7 +156,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .logout(proto_request)
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(MessageResponse::new("Successfully logged out"))
     }
@@ -177,6 +182,10 @@ impl AuthService for RemoteAuthServiceClient {
 }
 
 /// Creates a shareable auth service client.
+///
+/// # Errors
+///
+/// Returns `ArcanaError::Internal` if the gRPC channel to `addr` cannot be established.
 pub async fn create_remote_auth_service(addr: &str) -> ArcanaResult<Arc<dyn AuthService>> {
     let client = RemoteAuthServiceClient::connect(addr).await?;
     Ok(Arc::new(client))
@@ -184,7 +193,7 @@ pub async fn create_remote_auth_service(addr: &str) -> ArcanaResult<Arc<dyn Auth
 
 // Helper functions
 
-fn map_grpc_error(status: tonic::Status) -> ArcanaError {
+fn map_grpc_error(status: &tonic::Status) -> ArcanaError {
     match status.code() {
         tonic::Code::NotFound => ArcanaError::NotFound {
             resource_type: "Resource",

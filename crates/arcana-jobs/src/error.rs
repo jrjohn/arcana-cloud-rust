@@ -67,6 +67,7 @@ pub enum JobError {
 
 impl JobError {
     /// Returns true if this error is retryable.
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -79,6 +80,7 @@ impl JobError {
     }
 
     /// Returns true if the job should be moved to dead letter queue.
+    #[must_use]
     pub fn should_dlq(&self) -> bool {
         matches!(
             self,

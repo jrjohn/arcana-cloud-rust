@@ -115,6 +115,10 @@ pub enum Permission {
 impl Permission {
     /// Returns the minimum role required for this permission.
     #[must_use]
+    #[allow(
+        clippy::match_same_arms,
+        reason = "arms are grouped by permission category (user/plugin/system/content); merging across categories would obscure the mapping"
+    )]
     pub const fn minimum_role(&self) -> UserRole {
         match self {
             // User permissions

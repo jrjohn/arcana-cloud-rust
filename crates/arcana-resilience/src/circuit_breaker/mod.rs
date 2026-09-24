@@ -21,9 +21,9 @@ pub enum CircuitState {
 impl From<u8> for CircuitState {
     fn from(value: u8) -> Self {
         match value {
-            0 => Self::Closed,
             1 => Self::Open,
             2 => Self::HalfOpen,
+            // 0 is `Closed`; any unknown value also falls back to `Closed`.
             _ => Self::Closed,
         }
     }
@@ -94,6 +94,13 @@ impl CircuitBreaker {
     }
 
     /// Executes a function with circuit breaker protection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CircuitBreakerError::Open`] without calling `f` if the circuit
+    /// is open (and its timeout has not elapsed) or the half-open request budget
+    /// is exhausted, and [`CircuitBreakerError::Failure`] wrapping `f`'s error
+    /// if `f` fails.
     pub async fn call<F, Fut, T, E>(&self, f: F) -> Result<T, CircuitBreakerError<E>>
     where
         F: FnOnce() -> Fut,
@@ -107,7 +114,7 @@ impl CircuitBreaker {
         // Execute the function
         match f().await {
             Ok(result) => {
-                self.record_success().await;
+                self.record_success();
                 Ok(result)
             }
             Err(e) => {
@@ -147,7 +154,7 @@ impl CircuitBreaker {
     }
 
     /// Records a successful call.
-    async fn record_success(&self) {
+    fn record_success(&self) {
         let state = self.state();
 
         match state {
@@ -225,8 +232,8 @@ pub enum CircuitBreakerError<E> {
 impl<E: std::fmt::Display> std::fmt::Display for CircuitBreakerError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Open(name) => write!(f, "Circuit breaker '{}' is open", name),
-            Self::Failure(e) => write!(f, "Operation failed: {}", e),
+            Self::Open(name) => write!(f, "Circuit breaker '{name}' is open"),
+            Self::Failure(e) => write!(f, "Operation failed: {e}"),
         }
     }
 }

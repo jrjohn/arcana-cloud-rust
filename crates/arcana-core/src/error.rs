@@ -176,6 +176,10 @@ impl ArcanaError {
 
     /// Creates a not found error for a resource.
     #[must_use]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "public constructor used across the workspace with owned ids; taking a reference would change its signature"
+    )]
     pub fn not_found<T: ToString>(resource_type: &'static str, id: T) -> Self {
         Self::NotFound {
             resource_type,
@@ -261,7 +265,7 @@ impl From<sqlx::Error> for ArcanaError {
 
 impl From<serde_json::Error> for ArcanaError {
     fn from(err: serde_json::Error) -> Self {
-        Self::Internal(format!("JSON serialization error: {}", err))
+        Self::Internal(format!("JSON serialization error: {err}"))
     }
 }
 

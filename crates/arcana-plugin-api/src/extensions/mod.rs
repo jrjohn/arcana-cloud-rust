@@ -58,6 +58,11 @@ pub trait ServiceExtension: Send + Sync {
     fn info(&self) -> ServiceInfo;
 
     /// Invokes the service with the given method and parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a message when `method` is not supported by the
+    /// service, `params` cannot be interpreted, or the invocation itself fails.
     fn invoke(&self, method: &str, params: &str) -> Result<String, String>;
 }
 
@@ -76,6 +81,10 @@ pub trait EventListenerExtension: Send + Sync {
     fn subscriptions(&self) -> EventSubscription;
 
     /// Handles an event.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a message when the listener fails to process `event`.
     fn handle_event(&self, event: PluginEvent) -> Result<(), String>;
 }
 
@@ -102,6 +111,10 @@ pub trait ScheduledJobExtension: Send + Sync {
     fn config(&self) -> JobConfig;
 
     /// Executes the job.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a message when the job run described by `ctx` fails.
     fn execute(&self, ctx: JobContext) -> Result<(), String>;
 
     /// Checks if cancellation was requested.
@@ -144,6 +157,11 @@ pub trait SsrViewExtension: Send + Sync {
     fn config(&self) -> SsrViewConfig;
 
     /// Returns initial props for SSR.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a message when the initial props for the request in
+    /// `ctx` cannot be produced or serialized.
     fn get_initial_props(&self, ctx: SsrContext) -> Result<String, String>;
 }
 

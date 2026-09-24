@@ -70,7 +70,7 @@ impl user::user_service_server::UserService for UserGrpcService {
 
         let page_request = req.page.map_or_else(
             PageRequest::default,
-            |p| PageRequest::new(p.page as usize, p.size as usize),
+            |p| PageRequest::new(usize::try_from(p.page).unwrap_or(0), usize::try_from(p.size).unwrap_or(0)),
         );
 
         let response = self
@@ -79,15 +79,15 @@ impl user::user_service_server::UserService for UserGrpcService {
             .await
             .map_err(to_status)?;
 
-        let is_last = response.page >= response.total_pages.saturating_sub(1) as usize;
+        let is_last = response.page >= usize::try_from(response.total_pages.saturating_sub(1)).unwrap_or(usize::MAX);
 
         Ok(Response::new(user::ListUsersResponse {
             users: response.users.iter().map(to_proto_user).collect(),
             page_info: Some(common::PageInfo {
-                page: response.page as i32,
-                size: response.size as i32,
-                total_elements: response.total_elements as i64,
-                total_pages: response.total_pages as i64,
+                page: i32::try_from(response.page).unwrap_or(i32::MAX),
+                size: i32::try_from(response.size).unwrap_or(i32::MAX),
+                total_elements: i64::try_from(response.total_elements).unwrap_or(i64::MAX),
+                total_pages: i64::try_from(response.total_pages).unwrap_or(i64::MAX),
                 first: response.page == 0,
                 last: is_last,
             }),
@@ -250,7 +250,7 @@ impl user::user_service_server::UserService for UserGrpcService {
 fn parse_user_id(id: &str) -> Result<UserId, Status> {
     Uuid::parse_str(id)
         .map(UserId::from)
-        .map_err(|e| Status::invalid_argument(format!("Invalid user ID: {}", e)))
+        .map_err(|e| Status::invalid_argument(format!("Invalid user ID: {e}")))
 }
 
 fn to_status(err: arcana_core::ArcanaError) -> Status {
@@ -284,15 +284,15 @@ fn to_proto_user(user: &arcana_service::dto::UserResponse) -> user::User {
         avatar_url: user.avatar_url.clone(),
         last_login_at: user.last_login_at.map(|dt| common::Timestamp {
             seconds: dt.timestamp(),
-            nanos: dt.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(dt.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
         created_at: Some(common::Timestamp {
             seconds: user.created_at.timestamp(),
-            nanos: user.created_at.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(user.created_at.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
         updated_at: Some(common::Timestamp {
             seconds: user.created_at.timestamp(), // Using created_at as fallback
-            nanos: user.created_at.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(user.created_at.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
     }
 }

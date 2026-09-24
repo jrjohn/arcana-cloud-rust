@@ -267,7 +267,7 @@ impl Default for SecurityConfig {
         Self {
             jwt_secret: "change-me-in-production".to_string(),
             jwt_access_expiration_secs: 3600,      // 1 hour
-            jwt_refresh_expiration_secs: 604800,   // 7 days
+            jwt_refresh_expiration_secs: 604_800,   // 7 days
             jwt_issuer: "arcana-cloud".to_string(),
             jwt_audience: "arcana-api".to_string(),
             grpc_tls_enabled: false,
@@ -427,7 +427,7 @@ pub struct ObservabilityConfig {
     /// Service name for distributed tracing.
     #[serde(default = "default_service_name")]
     pub service_name: String,
-    /// OTLP endpoint URL (e.g., "http://localhost:4317").
+    /// OTLP endpoint URL (e.g., "<http://localhost:4317>").
     #[serde(default)]
     pub otlp_endpoint: Option<String>,
     /// Sampling ratio for traces (0.0 to 1.0).
@@ -459,7 +459,7 @@ impl Default for ObservabilityConfig {
 }
 
 impl ObservabilityConfig {
-    /// Convert to TelemetryConfig for arcana_core::telemetry.
+    /// Convert to `TelemetryConfig` for `arcana_core::telemetry`.
     #[must_use]
     pub fn to_telemetry_config(&self) -> arcana_core::telemetry::TelemetryConfig {
         arcana_core::telemetry::TelemetryConfig {

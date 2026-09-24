@@ -49,6 +49,7 @@ impl WorkerInfo {
     }
 
     /// Check if the worker is considered alive based on heartbeat timeout.
+    #[must_use]
     pub fn is_alive(&self, timeout: Duration) -> bool {
         self.last_heartbeat.elapsed() < timeout
     }
@@ -72,6 +73,7 @@ pub struct WorkerRegistry {
 
 impl WorkerRegistry {
     /// Create a new worker registry.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             workers: RwLock::new(HashMap::new()),
@@ -81,6 +83,7 @@ impl WorkerRegistry {
     }
 
     /// Create a new worker registry with custom heartbeat timeout.
+    #[must_use]
     pub fn with_timeout(heartbeat_timeout: Duration) -> Self {
         Self {
             workers: RwLock::new(HashMap::new()),
@@ -93,19 +96,19 @@ impl WorkerRegistry {
     ///
     /// Returns the registration sequence number.
     pub fn register(&self, worker_id: &str, queues: Vec<String>, concurrency: u32) -> u64 {
-        let info = WorkerInfo::new(worker_id.to_string(), queues.clone(), concurrency);
+        let info = WorkerInfo::new(worker_id.to_string(), queues, concurrency);
 
         let seq = self.registration_count.fetch_add(1, Ordering::Relaxed) + 1;
 
-        self.workers.write().insert(worker_id.to_string(), info);
-
         info!(
             worker_id = %worker_id,
-            queues = ?queues,
+            queues = ?info.queues,
             concurrency = concurrency,
             registration_seq = seq,
             "Worker registered"
         );
+
+        self.workers.write().insert(worker_id.to_string(), info);
 
         seq
     }
@@ -135,8 +138,7 @@ impl WorkerRegistry {
         self.workers
             .read()
             .get(worker_id)
-            .map(|w| w.is_alive(self.heartbeat_timeout))
-            .unwrap_or(false)
+            .is_some_and(|w| w.is_alive(self.heartbeat_timeout))
     }
 
     /// Unregister a worker.

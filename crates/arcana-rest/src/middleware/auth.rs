@@ -23,7 +23,8 @@ impl AuthMiddlewareState {
         Self { token_provider }
     }
 
-    /// Creates from a concrete TokenProvider (for backward compatibility).
+    /// Creates from a concrete `TokenProvider` (for backward compatibility).
+    #[must_use]
     pub fn from_provider(provider: Arc<TokenProvider>) -> Self {
         Self {
             token_provider: provider,
@@ -35,6 +36,12 @@ impl AuthMiddlewareState {
 ///
 /// This middleware extracts the token from the Authorization header,
 /// validates it, and adds the claims to the request extensions.
+///
+/// # Errors
+///
+/// Never returns `Err`: a missing or invalid token only means no claims are
+/// inserted, leaving handlers to decide whether authentication is required.
+/// The `Result` return type matches the `from_fn` middleware signature.
 pub async fn auth_middleware(
     State(state): State<AuthMiddlewareState>,
     mut request: Request<Body>,
@@ -69,6 +76,11 @@ pub async fn auth_middleware(
 /// Middleware that requires authentication.
 ///
 /// Returns 401 if no valid token is present.
+///
+/// # Errors
+///
+/// Returns `StatusCode::UNAUTHORIZED` if no [`Claims`] were inserted into the
+/// request extensions (i.e. `auth_middleware` found no valid access token).
 pub async fn require_auth(
     request: Request<Body>,
     next: Next,

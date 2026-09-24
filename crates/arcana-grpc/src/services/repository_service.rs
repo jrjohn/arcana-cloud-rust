@@ -139,7 +139,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
 
         let page_request = req.page.map_or_else(
             PageRequest::default,
-            |p| PageRequest::new(p.page as usize, p.size as usize),
+            |p| PageRequest::new(usize::try_from(p.page).unwrap_or(0), usize::try_from(p.size).unwrap_or(0)),
         );
 
         let page = self
@@ -148,7 +148,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
             .await
             .map_err(to_status)?;
 
-        Ok(Response::new(to_proto_user_list_result(page)))
+        Ok(Response::new(to_proto_user_list_result(&page)))
     }
 
     async fn find_users_by_role(
@@ -161,7 +161,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
         let role = from_proto_role(user_proto::UserRole::try_from(req.role).unwrap_or(user_proto::UserRole::User));
         let page_request = req.page.map_or_else(
             PageRequest::default,
-            |p| PageRequest::new(p.page as usize, p.size as usize),
+            |p| PageRequest::new(usize::try_from(p.page).unwrap_or(0), usize::try_from(p.size).unwrap_or(0)),
         );
 
         let page = self
@@ -170,7 +170,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
             .await
             .map_err(to_status)?;
 
-        Ok(Response::new(to_proto_user_list_result(page)))
+        Ok(Response::new(to_proto_user_list_result(&page)))
     }
 
     async fn save_user(
@@ -272,7 +272,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
 fn parse_user_id(id: &str) -> Result<UserId, Status> {
     uuid::Uuid::parse_str(id)
         .map(UserId::from)
-        .map_err(|e| Status::invalid_argument(format!("Invalid user ID: {}", e)))
+        .map_err(|e| Status::invalid_argument(format!("Invalid user ID: {e}")))
 }
 
 fn to_status(err: arcana_core::ArcanaError) -> Status {
@@ -303,15 +303,15 @@ fn to_proto_user_data(user: &User) -> repository::UserData {
         avatar_url: user.avatar_url.clone(),
         last_login_at: user.last_login_at.map(|dt| common::Timestamp {
             seconds: dt.timestamp(),
-            nanos: dt.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(dt.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
         created_at: Some(common::Timestamp {
             seconds: user.created_at.timestamp(),
-            nanos: user.created_at.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(user.created_at.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
         updated_at: Some(common::Timestamp {
             seconds: user.updated_at.timestamp(),
-            nanos: user.updated_at.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(user.updated_at.timestamp_subsec_nanos()).unwrap_or(i32::MAX),
         }),
     }
 }
@@ -325,19 +325,19 @@ fn from_proto_user_data(user: &repository::UserData) -> User {
     let created_at = user
         .created_at
         .as_ref()
-        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
+        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, u32::try_from(t.nanos).ok()?))
         .unwrap_or_else(chrono::Utc::now);
 
     let updated_at = user
         .updated_at
         .as_ref()
-        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
+        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, u32::try_from(t.nanos).ok()?))
         .unwrap_or_else(chrono::Utc::now);
 
     let last_login_at = user
         .last_login_at
         .as_ref()
-        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32));
+        .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, u32::try_from(t.nanos).ok()?));
 
     User {
         id,
@@ -356,14 +356,14 @@ fn from_proto_user_data(user: &repository::UserData) -> User {
     }
 }
 
-fn to_proto_user_list_result(page: Page<User>) -> repository::UserListResult {
+fn to_proto_user_list_result(page: &Page<User>) -> repository::UserListResult {
     repository::UserListResult {
         users: page.content.iter().map(to_proto_user_data).collect(),
         page_info: Some(common::PageInfo {
-            page: page.info.page as i32,
-            size: page.info.size as i32,
-            total_elements: page.info.total_elements as i64,
-            total_pages: page.info.total_pages as i64,
+            page: i32::try_from(page.info.page).unwrap_or(i32::MAX),
+            size: i32::try_from(page.info.size).unwrap_or(i32::MAX),
+            total_elements: i64::try_from(page.info.total_elements).unwrap_or(i64::MAX),
+            total_pages: i64::try_from(page.info.total_pages).unwrap_or(i64::MAX),
             first: page.info.first,
             last: page.info.last,
         }),

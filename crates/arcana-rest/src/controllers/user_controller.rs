@@ -34,6 +34,11 @@ pub fn router() -> Router<AppState> {
 }
 
 /// List all users (admin only).
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Forbidden` if the caller is below `Admin`,
+/// or a database error from the user service.
 #[utoipa::path(
     get,
     path = "/users",
@@ -65,6 +70,12 @@ pub async fn list_users(
 }
 
 /// Create a new user (admin only).
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Forbidden` if the caller is below `Admin`,
+/// `Conflict` if the username or email is already taken, `Validation` if the
+/// email is invalid, or a database/hashing error from the user service.
 #[utoipa::path(
     post,
     path = "/users",
@@ -95,6 +106,13 @@ pub async fn create_user(
 }
 
 /// Get a user by ID.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Validation` if `id` is not a UUID,
+/// `Internal` if the caller's token carries no user ID, `Forbidden` if the
+/// caller requests another user without the `Moderator` role, `NotFound` if the
+/// user does not exist, or a database error from the user service.
 #[utoipa::path(
     get,
     path = "/users/{id}",
@@ -136,6 +154,14 @@ pub async fn get_user(
 }
 
 /// Update a user's profile.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Validation` if `id` is not a UUID or the
+/// update is invalid, `Internal` if the caller's token carries no user ID,
+/// `Forbidden` if the caller updates another user without the `Admin` role,
+/// `NotFound` if the user does not exist, or a database error from the user
+/// service.
 #[utoipa::path(
     put,
     path = "/users/{id}",
@@ -180,6 +206,12 @@ pub async fn update_user(
 }
 
 /// Delete a user (admin only).
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Forbidden` if the caller is below `Admin`,
+/// `Validation` if `id` is not a UUID, `NotFound` if the user does not exist,
+/// or a database error from the user service.
 #[utoipa::path(
     delete,
     path = "/users/{id}",
@@ -214,6 +246,13 @@ pub async fn delete_user(
 }
 
 /// Update a user's role (admin only).
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Forbidden` if the caller is below `Admin`
+/// (or below `SuperAdmin` when granting `SuperAdmin`), `Validation` if `id` is
+/// not a UUID, `NotFound` if the user does not exist, or a database error from
+/// the user service.
 #[utoipa::path(
     patch,
     path = "/users/{id}/role",
@@ -255,6 +294,12 @@ pub async fn update_user_role(
 }
 
 /// Update a user's status (admin only).
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Forbidden` if the caller is below `Admin`,
+/// `Validation` if `id` is not a UUID, `NotFound` if the user does not exist,
+/// or a database error from the user service.
 #[utoipa::path(
     patch,
     path = "/users/{id}/status",
@@ -291,6 +336,14 @@ pub async fn update_user_status(
 }
 
 /// Change a user's password.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Validation` if `id` is not a UUID,
+/// `Internal` if the caller's token carries no user ID, `Forbidden` if `id` is
+/// not the caller, `NotFound` if the user does not exist, `InvalidCredentials`
+/// if the current password is wrong, or a database/hashing error from the user
+/// service.
 #[utoipa::path(
     put,
     path = "/users/{id}/password",
@@ -338,5 +391,5 @@ pub async fn change_password(
 
 /// Helper to parse user ID from path parameter.
 fn parse_user_id(id: &str) -> Result<UserId, AppError> {
-    UserId::parse(id).map_err(|_| AppError(ArcanaError::Validation(format!("Invalid user ID: {}", id))))
+    UserId::parse(id).map_err(|_| AppError(ArcanaError::Validation(format!("Invalid user ID: {id}"))))
 }

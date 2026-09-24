@@ -41,7 +41,7 @@ pub struct TelemetryConfig {
     #[serde(default = "default_service_name")]
     pub service_name: String,
 
-    /// OTLP endpoint URL (e.g., "http://localhost:4317").
+    /// OTLP endpoint URL (e.g., "<http://localhost:4317>").
     #[serde(default)]
     pub otlp_endpoint: Option<String>,
 
@@ -84,11 +84,16 @@ impl Default for TelemetryConfig {
 /// - OpenTelemetry tracer with OTLP exporter (if endpoint configured)
 /// - tracing subscriber with OpenTelemetry layer
 /// - Console output layer (if enabled)
+///
+/// # Errors
+///
+/// Returns [`crate::ArcanaError::Internal`] if `config.enabled` is set, an
+/// `otlp_endpoint` is configured, and the OTLP span exporter cannot be built.
 #[cfg(feature = "telemetry")]
 pub fn init_telemetry(config: &TelemetryConfig) -> ArcanaResult<()> {
     if !config.enabled {
         // Just initialize basic tracing without OpenTelemetry
-        init_basic_tracing(config.console_output)?;
+        init_basic_tracing(config.console_output);
         return Ok(());
     }
 
@@ -110,7 +115,7 @@ pub fn init_telemetry(config: &TelemetryConfig) -> ArcanaResult<()> {
             .with_tonic()
             .with_endpoint(endpoint)
             .build()
-            .map_err(|e| crate::ArcanaError::Internal(format!("Failed to create OTLP exporter: {}", e)))?;
+            .map_err(|e| crate::ArcanaError::Internal(format!("Failed to create OTLP exporter: {e}")))?;
 
         SdkTracerProvider::builder()
             .with_batch_exporter(exporter)
@@ -162,9 +167,9 @@ pub fn init_telemetry(config: &TelemetryConfig) -> ArcanaResult<()> {
 
 /// Initialize basic tracing without OpenTelemetry.
 #[cfg(feature = "telemetry")]
-fn init_basic_tracing(console_output: bool) -> ArcanaResult<()> {
+fn init_basic_tracing(console_output: bool) {
     if !console_output {
-        return Ok(());
+        return;
     }
 
     let filter = EnvFilter::try_from_default_env()
@@ -174,8 +179,6 @@ fn init_basic_tracing(console_output: bool) -> ArcanaResult<()> {
         .with(filter)
         .with(tracing_subscriber::fmt::layer().with_target(true))
         .init();
-
-    Ok(())
 }
 
 /// Shutdown telemetry, flushing any pending spans.
@@ -190,6 +193,10 @@ pub fn shutdown_telemetry() {
 }
 
 /// Placeholder for when telemetry feature is disabled.
+///
+/// # Errors
+///
+/// Never returns an error; the `Result` mirrors the telemetry-enabled signature.
 #[cfg(not(feature = "telemetry"))]
 pub fn init_telemetry(_config: &TelemetryConfig) -> ArcanaResult<()> {
     Ok(())

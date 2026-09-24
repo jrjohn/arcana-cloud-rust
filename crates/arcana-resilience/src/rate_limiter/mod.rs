@@ -17,6 +17,7 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     /// Creates a new rate limiter with the specified requests per second.
+    #[must_use]
     pub fn new(requests_per_second: u32) -> Self {
         let quota = Quota::per_second(NonZeroU32::new(requests_per_second).unwrap_or(NonZeroU32::MIN));
         let limiter = Arc::new(GovernorRateLimiter::direct(quota));
@@ -24,6 +25,7 @@ impl RateLimiter {
     }
 
     /// Creates a rate limiter with requests per minute.
+    #[must_use]
     pub fn per_minute(requests: u32) -> Self {
         let quota = Quota::per_minute(NonZeroU32::new(requests).unwrap_or(NonZeroU32::MIN));
         let limiter = Arc::new(GovernorRateLimiter::direct(quota));
@@ -31,6 +33,11 @@ impl RateLimiter {
     }
 
     /// Checks if a request is allowed (non-blocking).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::RateLimitExceeded`] if the quota has no capacity
+    /// left at the moment of the call.
     pub fn check(&self) -> Result<(), ArcanaError> {
         self.limiter
             .check()
@@ -43,6 +50,11 @@ impl RateLimiter {
     }
 
     /// Checks if a request is allowed, waiting if necessary up to the timeout.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns `Err`: it waits (with up to 100 ms of jitter)
+    /// until the quota admits the request and then returns `Ok(())`.
     pub async fn check_with_wait(&self) -> Result<(), ArcanaError> {
         self.limiter
             .until_ready_with_jitter(governor::Jitter::up_to(std::time::Duration::from_millis(100)))

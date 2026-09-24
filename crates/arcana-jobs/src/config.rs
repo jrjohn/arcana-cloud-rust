@@ -125,8 +125,7 @@ impl Default for WorkerConfig {
 fn default_concurrency() -> usize {
     // Use available parallelism or fallback to 4
     std::thread::available_parallelism()
-        .map(|p| p.get())
-        .unwrap_or(4)
+        .map_or(4, std::num::NonZero::get)
         .max(4)
 }
 
@@ -230,7 +229,7 @@ fn default_initial_delay() -> u64 {
 }
 
 fn default_max_delay() -> u64 {
-    3600000 // 1 hour
+    3_600_000 // 1 hour
 }
 
 fn default_multiplier() -> f64 {
@@ -342,16 +341,19 @@ fn default_scheduler_key_prefix() -> String {
 
 impl WorkerConfig {
     /// Returns job timeout as Duration.
+    #[must_use]
     pub fn job_timeout(&self) -> Duration {
         Duration::from_secs(self.job_timeout_secs)
     }
 
     /// Returns poll interval as Duration.
+    #[must_use]
     pub fn poll_interval(&self) -> Duration {
         Duration::from_millis(self.poll_interval_ms)
     }
 
     /// Returns shutdown timeout as Duration.
+    #[must_use]
     pub fn shutdown_timeout(&self) -> Duration {
         Duration::from_secs(self.shutdown_timeout_secs)
     }

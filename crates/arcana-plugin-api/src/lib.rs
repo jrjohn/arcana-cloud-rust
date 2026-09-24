@@ -50,14 +50,34 @@ pub trait Plugin: Send + Sync {
     fn descriptor(&self) -> &PluginDescriptor;
 
     /// Called when the plugin is installed.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a human-readable message when the plugin cannot
+    /// complete installation; the platform treats this as a failed lifecycle transition.
     fn on_install(&mut self) -> Result<(), String>;
 
     /// Called when the plugin is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a human-readable message when the plugin cannot
+    /// complete enabling; the platform treats this as a failed lifecycle transition.
     fn on_enable(&mut self) -> Result<(), String>;
 
     /// Called when the plugin is disabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a human-readable message when the plugin cannot
+    /// complete disabling; the platform treats this as a failed lifecycle transition.
     fn on_disable(&mut self) -> Result<(), String>;
 
     /// Called when the plugin is uninstalled.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with a human-readable message when the plugin cannot
+    /// complete uninstallation; the platform treats this as a failed lifecycle transition.
     fn on_uninstall(&mut self) -> Result<(), String>;
 }

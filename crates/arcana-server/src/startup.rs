@@ -4,7 +4,7 @@ use tracing::info;
 
 /// Prints the startup banner.
 pub fn print_banner() {
-    info!(r#"
+    info!(r"
     ___                                   ________                __
    /   |  ______________ _____  ____ _   / ____/ /___  __  ______/ /
   / /| | / ___/ ___/ __ `/ __ \/ __ `/  / /   / / __ \/ / / / __  /
@@ -12,7 +12,7 @@ pub fn print_banner() {
 /_/  |_/_/   \___/\__,_/_/ /_/\__,_/   \____/_/\____/\__,_/\__,_/
 
                          Rust Edition
-    "#);
+    ");
 }
 
 /// Prints server startup information.

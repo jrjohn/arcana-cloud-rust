@@ -19,15 +19,21 @@ pub struct RemoteUserServiceClient {
 
 impl RemoteUserServiceClient {
     /// Creates a new remote user service client.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Internal` if the gRPC channel to `addr` cannot be established
+    /// (invalid URI or connection failure).
     pub async fn connect(addr: &str) -> ArcanaResult<Self> {
         let client = user::user_service_client::UserServiceClient::connect(addr.to_string())
             .await
-            .map_err(|e| ArcanaError::Internal(format!("Failed to connect to user service: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to connect to user service: {e}")))?;
 
         Ok(Self { client })
     }
 
     /// Creates from an existing channel.
+    #[must_use]
     pub fn from_channel(channel: Channel) -> Self {
         Self {
             client: user::user_service_client::UserServiceClient::new(channel),
@@ -53,7 +59,7 @@ impl UserService for RemoteUserServiceClient {
             .clone()
             .create_user(proto_request)
             .await
-            .map_err(|e| ArcanaError::Internal(format!("gRPC error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("gRPC error: {e}")))?;
 
         let user = response
             .into_inner()
@@ -73,7 +79,7 @@ impl UserService for RemoteUserServiceClient {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let user = response
             .into_inner()
@@ -93,7 +99,7 @@ impl UserService for RemoteUserServiceClient {
                 username: username.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let user = response
             .into_inner()
@@ -111,23 +117,23 @@ impl UserService for RemoteUserServiceClient {
             .clone()
             .list_users(user::ListUsersRequest {
                 page: Some(common::PageRequest {
-                    page: page.page as i32,
-                    size: page.size as i32,
+                    page: i32::try_from(page.page).unwrap_or(i32::MAX),
+                    size: i32::try_from(page.size).unwrap_or(i32::MAX),
                 }),
                 role_filter: None,
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let inner = response.into_inner();
         let page_info = inner.page_info.unwrap_or_default();
 
         Ok(UserListResponse {
             users: inner.users.iter().map(from_proto_user).collect(),
-            page: page_info.page as usize,
-            size: page_info.size as usize,
-            total_elements: page_info.total_elements as u64,
-            total_pages: page_info.total_pages as u64,
+            page: usize::try_from(page_info.page).unwrap_or(0),
+            size: usize::try_from(page_info.size).unwrap_or(0),
+            total_elements: u64::try_from(page_info.total_elements).unwrap_or(0),
+            total_pages: u64::try_from(page_info.total_pages).unwrap_or(0),
         })
     }
 
@@ -144,7 +150,7 @@ impl UserService for RemoteUserServiceClient {
                 avatar_url: request.avatar_url,
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let user = response
             .into_inner()
@@ -165,7 +171,7 @@ impl UserService for RemoteUserServiceClient {
                 role: to_proto_role(request.role) as i32,
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let user = response
             .into_inner()
@@ -187,7 +193,7 @@ impl UserService for RemoteUserServiceClient {
                 reason: request.reason,
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         let user = response
             .into_inner()
@@ -211,7 +217,7 @@ impl UserService for RemoteUserServiceClient {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(())
     }
@@ -224,7 +230,7 @@ impl UserService for RemoteUserServiceClient {
                 username: username.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().exists)
     }
@@ -237,13 +243,17 @@ impl UserService for RemoteUserServiceClient {
                 email: email.to_string(),
             })
             .await
-            .map_err(map_grpc_error)?;
+            .map_err(|e| map_grpc_error(&e))?;
 
         Ok(response.into_inner().exists)
     }
 }
 
 /// Creates a shareable user service client.
+///
+/// # Errors
+///
+/// Returns `ArcanaError::Internal` if the gRPC channel to `addr` cannot be established.
 pub async fn create_remote_user_service(addr: &str) -> ArcanaResult<Arc<dyn UserService>> {
     let client = RemoteUserServiceClient::connect(addr).await?;
     Ok(Arc::new(client))
@@ -251,7 +261,7 @@ pub async fn create_remote_user_service(addr: &str) -> ArcanaResult<Arc<dyn User
 
 // Helper functions
 
-fn map_grpc_error(status: tonic::Status) -> ArcanaError {
+fn map_grpc_error(status: &tonic::Status) -> ArcanaError {
     match status.code() {
         tonic::Code::NotFound => ArcanaError::NotFound {
             resource_type: "Resource",
@@ -277,17 +287,19 @@ fn from_proto_user(user: &user::User) -> UserResponse {
         email_verified: user.email_verified,
         avatar_url: user.avatar_url.clone(),
         last_login_at: user.last_login_at.as_ref().map(|t| {
-            chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32)
+            u32::try_from(t.nanos)
+                .ok()
+                .and_then(|nanos| chrono::DateTime::from_timestamp(t.seconds, nanos))
                 .unwrap_or_else(chrono::Utc::now)
         }),
         created_at: user
             .created_at
-            .as_ref()
-            .map(|t| {
-                chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32)
+            .as_ref().map_or_else(chrono::Utc::now, |t| {
+                u32::try_from(t.nanos)
+                .ok()
+                .and_then(|nanos| chrono::DateTime::from_timestamp(t.seconds, nanos))
                     .unwrap_or_else(chrono::Utc::now)
-            })
-            .unwrap_or_else(chrono::Utc::now),
+            }),
     }
 }
 

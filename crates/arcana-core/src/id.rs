@@ -25,6 +25,10 @@ impl UserId {
     }
 
     /// Parses a user ID from a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`uuid::Error`] if `s` is not a valid UUID string.
     pub fn parse(s: &str) -> Result<Self, uuid::Error> {
         Ok(Self(Uuid::parse_str(s)?))
     }

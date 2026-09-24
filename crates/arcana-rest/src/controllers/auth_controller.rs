@@ -23,6 +23,13 @@ pub fn router() -> Router<AppState> {
 }
 
 /// Register a new user.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping the auth service error: `Conflict` if the
+/// username or email is already taken, `Validation` if the email is invalid,
+/// or a database/hashing/token error if persisting the user or issuing tokens
+/// fails.
 #[utoipa::path(
     post,
     path = "/auth/register",
@@ -46,6 +53,13 @@ pub async fn register(
 }
 
 /// Login with username/email and password.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `InvalidCredentials` if no such user
+/// exists, the account is deleted or the password is wrong, `Forbidden` if the
+/// account is suspended, locked or otherwise inactive, or a database/token
+/// error from the auth service.
 #[utoipa::path(
     post,
     path = "/auth/login",
@@ -68,6 +82,13 @@ pub async fn login(
 }
 
 /// Refresh access token using refresh token.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `InvalidToken`/`TokenExpired` if the refresh
+/// token is invalid, expired, carries no user ID or names a user that no longer
+/// exists, `Forbidden` if that user is not active, or a database/token error
+/// from the auth service.
 #[utoipa::path(
     post,
     path = "/auth/refresh",
@@ -90,6 +111,11 @@ pub async fn refresh_token(
 }
 
 /// Logout (invalidate tokens).
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `Internal` if the token carries no user ID,
+/// or any error returned by the auth service's `logout`.
 #[utoipa::path(
     post,
     path = "/auth/logout",
@@ -117,6 +143,12 @@ pub async fn logout(
 }
 
 /// Get current authenticated user.
+///
+/// # Errors
+///
+/// Returns an [`AppError`] wrapping `InvalidToken` if the token carries no user
+/// ID, `NotFound` if the user no longer exists, or a database error from the
+/// auth service.
 #[utoipa::path(
     get,
     path = "/auth/me",

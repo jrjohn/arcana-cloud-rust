@@ -13,7 +13,7 @@ use tracing::{info, warn};
 /// This trait abstracts database pool functionality for dependency injection.
 #[async_trait]
 pub trait DatabasePoolInterface: Interface + Send + Sync {
-    /// Returns a reference to the underlying MySQL pool.
+    /// Returns a reference to the underlying `MySQL` pool.
     fn inner(&self) -> &MySqlPool;
 
     /// Checks if the database connection is healthy.
@@ -37,6 +37,12 @@ impl DatabasePool {
     /// Creates a new database pool from configuration.
     ///
     /// Alias: [`connect`](Self::connect)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Database`] if the pool cannot establish its
+    /// initial connection(s) to `config.url` (bad URL, unreachable server,
+    /// authentication failure or acquire timeout).
     pub async fn new(config: &DatabaseConfig) -> ArcanaResult<Self> {
         info!("Connecting to MySQL database...");
 
@@ -49,7 +55,7 @@ impl DatabasePool {
             .await
             .map_err(|e| {
                 warn!("Failed to connect to database: {}", e);
-                ArcanaError::Database(format!("Failed to connect: {}", e))
+                ArcanaError::Database(format!("Failed to connect: {e}"))
             })?;
 
         info!("MySQL connection pool established");
@@ -63,21 +69,30 @@ impl DatabasePool {
     }
 
     /// Checks if the database connection is healthy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Database`] if `SELECT 1` fails to execute.
     pub async fn health_check(&self) -> ArcanaResult<()> {
         sqlx::query("SELECT 1")
             .execute(&self.pool)
             .await
-            .map_err(|e| ArcanaError::Database(format!("Health check failed: {}", e)))?;
+            .map_err(|e| ArcanaError::Database(format!("Health check failed: {e}")))?;
         Ok(())
     }
 
     /// Runs database migrations.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Database`] if any migration fails to apply or a
+    /// previously applied migration no longer matches its recorded checksum.
     pub async fn run_migrations(&self) -> ArcanaResult<()> {
         info!("Running database migrations...");
         sqlx::migrate!("../../migrations")
             .run(&self.pool)
             .await
-            .map_err(|e| ArcanaError::Database(format!("Migration failed: {}", e)))?;
+            .map_err(|e| ArcanaError::Database(format!("Migration failed: {e}")))?;
         info!("Database migrations completed");
         Ok(())
     }
@@ -89,7 +104,7 @@ impl DatabasePool {
         info!("Database connection pool closed");
     }
 
-    /// Creates DatabasePool with a pre-existing pool (for Shaku injection).
+    /// Creates `DatabasePool` with a pre-existing pool (for Shaku injection).
     #[must_use]
     pub fn with_pool(pool: MySqlPool) -> Self {
         Self { pool }
@@ -98,6 +113,10 @@ impl DatabasePool {
     /// Creates a new database pool from configuration.
     ///
     /// This is an alias for [`new`](Self::new).
+    ///
+    /// # Errors
+    ///
+    /// Same as [`new`](Self::new).
     pub async fn connect(config: &DatabaseConfig) -> ArcanaResult<Self> {
         Self::new(config).await
     }
@@ -113,7 +132,7 @@ impl DatabasePoolInterface for DatabasePool {
         sqlx::query("SELECT 1")
             .execute(&self.pool)
             .await
-            .map_err(|e| ArcanaError::Database(format!("Health check failed: {}", e)))?;
+            .map_err(|e| ArcanaError::Database(format!("Health check failed: {e}")))?;
         Ok(())
     }
 
@@ -122,7 +141,7 @@ impl DatabasePoolInterface for DatabasePool {
         sqlx::migrate!("../../migrations")
             .run(&self.pool)
             .await
-            .map_err(|e| ArcanaError::Database(format!("Migration failed: {}", e)))?;
+            .map_err(|e| ArcanaError::Database(format!("Migration failed: {e}")))?;
         info!("Database migrations completed");
         Ok(())
     }
@@ -152,6 +171,10 @@ impl std::fmt::Debug for DatabasePool {
 }
 
 /// Creates a shared database pool.
+///
+/// # Errors
+///
+/// Same as [`DatabasePool::new`].
 pub async fn create_pool(config: &DatabaseConfig) -> ArcanaResult<std::sync::Arc<DatabasePool>> {
     let pool = DatabasePool::new(config).await?;
     Ok(std::sync::Arc::new(pool))

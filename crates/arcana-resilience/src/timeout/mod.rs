@@ -4,6 +4,11 @@ use arcana_core::ArcanaError;
 use std::time::Duration;
 
 /// Wraps an async operation with a timeout.
+///
+/// # Errors
+///
+/// Returns [`ArcanaError::Timeout`] if the future produced by `f` does not
+/// complete within `duration`, otherwise whatever error that future returns.
 pub async fn with_timeout<F, Fut, T>(duration: Duration, f: F) -> Result<T, ArcanaError>
 where
     F: FnOnce() -> Fut,
@@ -11,7 +16,7 @@ where
 {
     tokio::time::timeout(duration, f())
         .await
-        .map_err(|_| ArcanaError::Timeout(format!("Operation timed out after {:?}", duration)))?
+        .map_err(|_| ArcanaError::Timeout(format!("Operation timed out after {duration:?}")))?
 }
 
 /// Timeout configuration.
@@ -30,7 +35,7 @@ impl Default for TimeoutConfig {
         Self {
             default_timeout: Duration::from_secs(30),
             database_timeout: Duration::from_secs(10),
-            external_service_timeout: Duration::from_secs(60),
+            external_service_timeout: Duration::from_mins(1),
         }
     }
 }

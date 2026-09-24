@@ -14,9 +14,20 @@ use tracing::debug;
 /// This trait abstracts password hashing functionality for dependency injection.
 pub trait PasswordHasherInterface: Interface + Send + Sync {
     /// Hashes a password.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Internal`] if Argon2 fails to hash the password
+    /// (e.g. the password exceeds Argon2's maximum input length).
     fn hash(&self, password: &str) -> ArcanaResult<String>;
 
     /// Verifies a password against a hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Internal`] if `hash` is not a valid PHC hash
+    /// string or verification fails for a reason other than a wrong password.
+    /// A wrong password yields `Ok(false)`, not an error.
     fn verify(&self, password: &str, hash: &str) -> ArcanaResult<bool>;
 
     /// Checks if a hash needs to be rehashed.
@@ -69,22 +80,33 @@ impl PasswordHasher {
     }
 
     /// Hashes a password.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Internal`] if Argon2 fails to hash the password
+    /// (e.g. the password exceeds Argon2's maximum input length).
     pub fn hash(&self, password: &str) -> ArcanaResult<String> {
         let salt = SaltString::generate(&mut OsRng);
 
         let hash = self
             .argon2
             .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {e}")))?;
 
         debug!("Password hashed successfully");
         Ok(hash.to_string())
     }
 
     /// Verifies a password against a hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Internal`] if `hash` is not a valid PHC hash
+    /// string or verification fails for a reason other than a wrong password.
+    /// A wrong password yields `Ok(false)`, not an error.
     pub fn verify(&self, password: &str, hash: &str) -> ArcanaResult<bool> {
         let parsed_hash = PasswordHash::new(hash)
-            .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {e}")))?;
 
         match self.argon2.verify_password(password.as_bytes(), &parsed_hash) {
             Ok(()) => {
@@ -96,13 +118,13 @@ impl PasswordHasher {
                 Ok(false)
             }
             Err(e) => Err(ArcanaError::Internal(format!(
-                "Password verification error: {}",
-                e
+                "Password verification error: {e}"
             ))),
         }
     }
 
     /// Checks if a hash needs to be rehashed (e.g., due to parameter changes).
+    #[must_use]
     pub fn needs_rehash(&self, hash: &str) -> bool {
         // Parse the hash to check its parameters
         if let Ok(parsed) = PasswordHash::new(hash) {
@@ -131,7 +153,7 @@ impl PasswordHasherInterface for PasswordHasher {
         let hash = self
             .argon2
             .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {e}")))?;
 
         debug!("Password hashed successfully");
         Ok(hash.to_string())
@@ -139,7 +161,7 @@ impl PasswordHasherInterface for PasswordHasher {
 
     fn verify(&self, password: &str, hash: &str) -> ArcanaResult<bool> {
         let parsed_hash = PasswordHash::new(hash)
-            .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {e}")))?;
 
         match self.argon2.verify_password(password.as_bytes(), &parsed_hash) {
             Ok(()) => {
@@ -151,8 +173,7 @@ impl PasswordHasherInterface for PasswordHasher {
                 Ok(false)
             }
             Err(e) => Err(ArcanaError::Internal(format!(
-                "Password verification error: {}",
-                e
+                "Password verification error: {e}"
             ))),
         }
     }
@@ -176,6 +197,12 @@ impl std::fmt::Debug for PasswordHasher {
 }
 
 /// Validates password strength.
+///
+/// # Errors
+///
+/// Returns every rule the password violates: shorter than 8 or longer than
+/// 128 bytes, or missing an uppercase letter, lowercase letter, digit or
+/// special character.
 pub fn validate_password_strength(password: &str) -> Result<(), Vec<&'static str>> {
     let mut errors = Vec::new();
 
@@ -187,11 +214,11 @@ pub fn validate_password_strength(password: &str) -> Result<(), Vec<&'static str
         errors.push("Password must be at most 128 characters long");
     }
 
-    if !password.chars().any(|c| c.is_uppercase()) {
+    if !password.chars().any(char::is_uppercase) {
         errors.push("Password must contain at least one uppercase letter");
     }
 
-    if !password.chars().any(|c| c.is_lowercase()) {
+    if !password.chars().any(char::is_lowercase) {
         errors.push("Password must contain at least one lowercase letter");
     }
 

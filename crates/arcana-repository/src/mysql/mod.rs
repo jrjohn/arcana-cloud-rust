@@ -1,4 +1,4 @@
-//! MySQL repository implementations (backward-compatible).
+//! `MySQL` repository implementations (backward-compatible).
 //!
 //! `MySqlUserDaoImpl` has moved to `dao/impl/mysql/user_dao_impl.rs` per the
 //! unified Arcana impl/interface standard. It remains accessible as

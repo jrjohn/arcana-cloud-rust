@@ -6,7 +6,7 @@
 //!
 //! - **worker** is stateless and scales on queue depth.
 //! - **scheduler** elects a single leader, so extra replicas are standby only
-//!   and it must never be attached to a HorizontalPodAutoscaler.
+//!   and it must never be attached to a `HorizontalPodAutoscaler`.
 //!
 //! Both expose the same small operations surface (`/health`, `/live`,
 //! `/ready`, `/metrics`) on the configured REST port, which is what the
@@ -37,6 +37,12 @@ struct OpsState {
 }
 
 /// Runs the background job worker role.
+///
+/// # Errors
+///
+/// Returns [`ArcanaError::Internal`] if the Prometheus metrics recorder cannot
+/// be installed (e.g. one is already installed) or the job-queue Redis pool
+/// cannot be created.
 pub async fn run_worker(config: AppConfig, jobs_config: JobsConfig) -> ArcanaResult<()> {
     info!("Starting Worker role");
 
@@ -79,6 +85,12 @@ pub async fn run_worker(config: AppConfig, jobs_config: JobsConfig) -> ArcanaRes
 }
 
 /// Runs the cron scheduler role.
+///
+/// # Errors
+///
+/// Returns [`ArcanaError::Configuration`] if `jobs.scheduler.enabled` is false,
+/// and [`ArcanaError::Internal`] if the metrics recorder cannot be installed or
+/// the scheduler Redis pool cannot be created.
 pub async fn run_scheduler(config: AppConfig, jobs_config: JobsConfig) -> ArcanaResult<()> {
     info!("Starting Scheduler role");
 
@@ -260,6 +272,11 @@ impl EmbeddedJobs {
 ///
 /// Returns `Ok(None)` when the subsystem is switched off, which is the default:
 /// a deployment without Redis must still start.
+///
+/// # Errors
+///
+/// Returns [`ArcanaError::Internal`] if jobs are enabled and the job-queue
+/// Redis pool cannot be created.
 pub async fn spawn_embedded(jobs_config: &JobsConfig) -> ArcanaResult<Option<EmbeddedJobs>> {
     if !jobs_config.enabled {
         info!("Embedded job runtime disabled (jobs.enabled = false)");

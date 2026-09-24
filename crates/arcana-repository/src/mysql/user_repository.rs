@@ -1,6 +1,7 @@
-//! MySQL user repository implementation.
+//! `MySQL` user repository implementation.
 
 use crate::{traits::UserRepository, DatabasePoolInterface};
+use crate::sql_convert::{count_to_u64, to_sql_bigint};
 use arcana_core::{ArcanaError, ArcanaResult, Page, PageRequest, UserId};
 use arcana_core::{Email, User, UserRole, UserStatus};
 use async_trait::async_trait;
@@ -11,7 +12,7 @@ use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
-/// MySQL user repository implementation.
+/// `MySQL` user repository implementation.
 #[derive(Component, Clone)]
 #[shaku(interface = UserRepository)]
 pub struct MySqlUserRepository {
@@ -20,7 +21,7 @@ pub struct MySqlUserRepository {
 }
 
 impl MySqlUserRepository {
-    /// Creates a new MySQL user repository.
+    /// Creates a new `MySQL` user repository.
     #[must_use]
     pub fn new(pool: Arc<dyn DatabasePoolInterface>) -> Self {
         Self { pool }
@@ -50,7 +51,7 @@ impl TryFrom<UserRow> for User {
 
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         let id = Uuid::parse_str(&row.id)
-            .map_err(|e| ArcanaError::Internal(format!("Invalid UUID in database: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Invalid UUID in database: {e}")))?;
 
         Ok(User {
             id: UserId::from_uuid(id),
@@ -95,13 +96,13 @@ impl UserRepository for MySqlUserRepository {
         debug!("Finding user by id: {}", id);
 
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users
             WHERE id = ? AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(id.into_inner().to_string())
         .fetch_optional(self.pool.inner())
@@ -114,13 +115,13 @@ impl UserRepository for MySqlUserRepository {
         debug!("Finding user by username: {}", username);
 
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users
             WHERE username = ? AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(username)
         .fetch_optional(self.pool.inner())
@@ -133,13 +134,13 @@ impl UserRepository for MySqlUserRepository {
         debug!("Finding user by email: {}", email);
 
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users
             WHERE LOWER(email) = LOWER(?) AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(email)
         .fetch_optional(self.pool.inner())
@@ -152,13 +153,13 @@ impl UserRepository for MySqlUserRepository {
         debug!("Finding user by username or email: {}", identifier);
 
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users
             WHERE (username = ? OR LOWER(email) = LOWER(?)) AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(identifier)
         .bind(identifier)
@@ -198,7 +199,7 @@ impl UserRepository for MySqlUserRepository {
             .await?;
 
         let rows = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
@@ -206,10 +207,10 @@ impl UserRepository for MySqlUserRepository {
             WHERE status != 'deleted'
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
-            "#,
+            ",
         )
-        .bind(page.limit() as i64)
-        .bind(page.offset() as i64)
+        .bind(to_sql_bigint(page.limit()))
+        .bind(to_sql_bigint(page.offset()))
         .fetch_all(self.pool.inner())
         .await?;
 
@@ -218,7 +219,7 @@ impl UserRepository for MySqlUserRepository {
             .map(User::try_from)
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Page::new(users, page.page, page.size, total as u64))
+        Ok(Page::new(users, page.page, page.size, count_to_u64(total)))
     }
 
     async fn find_by_role(&self, role: UserRole, page: PageRequest) -> ArcanaResult<Page<User>> {
@@ -234,7 +235,7 @@ impl UserRepository for MySqlUserRepository {
         .await?;
 
         let rows = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
@@ -242,11 +243,11 @@ impl UserRepository for MySqlUserRepository {
             WHERE role = ? AND status != 'deleted'
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
-            "#,
+            ",
         )
         .bind(&role_str)
-        .bind(page.limit() as i64)
-        .bind(page.offset() as i64)
+        .bind(to_sql_bigint(page.limit()))
+        .bind(to_sql_bigint(page.offset()))
         .fetch_all(self.pool.inner())
         .await?;
 
@@ -255,7 +256,7 @@ impl UserRepository for MySqlUserRepository {
             .map(User::try_from)
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Page::new(users, page.page, page.size, total as u64))
+        Ok(Page::new(users, page.page, page.size, count_to_u64(total)))
     }
 
     async fn save(&self, user: &User) -> ArcanaResult<User> {
@@ -265,11 +266,11 @@ impl UserRepository for MySqlUserRepository {
 
         // MySQL doesn't support RETURNING, so insert then select
         sqlx::query(
-            r#"
+            r"
             INSERT INTO users (id, username, email, password_hash, first_name, last_name,
                               role, status, email_verified, avatar_url, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
+            ",
         )
         .bind(&id_str)
         .bind(&user.username)
@@ -299,13 +300,13 @@ impl UserRepository for MySqlUserRepository {
 
         // MySQL doesn't support RETURNING, so update then select
         sqlx::query(
-            r#"
+            r"
             UPDATE users
             SET username = ?, email = ?, password_hash = ?, first_name = ?,
                 last_name = ?, role = ?, status = ?, email_verified = ?,
                 avatar_url = ?, last_login_at = ?, updated_at = ?
             WHERE id = ?
-            "#,
+            ",
         )
         .bind(&user.username)
         .bind(user.email.as_str())
@@ -346,7 +347,7 @@ impl UserRepository for MySqlUserRepository {
             .fetch_one(self.pool.inner())
             .await?;
 
-        Ok(count as u64)
+        Ok(count_to_u64(count))
     }
 
     async fn count_by_role(&self, role: UserRole) -> ArcanaResult<u64> {
@@ -357,7 +358,7 @@ impl UserRepository for MySqlUserRepository {
         .fetch_one(self.pool.inner())
         .await?;
 
-        Ok(count as u64)
+        Ok(count_to_u64(count))
     }
 }
 

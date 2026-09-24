@@ -29,6 +29,7 @@ impl<T> ApiResponse<T> {
     }
 
     /// Creates an error response.
+    #[must_use]
     pub fn error(error: ErrorResponse) -> ApiResponse<()> {
         ApiResponse {
             success: false,
@@ -64,6 +65,11 @@ impl IntoResponse for AppError {
 pub type ApiResult<T> = Result<Json<ApiResponse<T>>, AppError>;
 
 /// Helper to create a success response.
+///
+/// # Errors
+///
+/// Never returns `Err`; the [`ApiResult`] return type lets handlers end with
+/// `ok(value)` directly.
 pub fn ok<T: Serialize>(data: T) -> ApiResult<T> {
     Ok(Json(ApiResponse::success(data)))
 }
@@ -74,6 +80,7 @@ pub fn created<T: Serialize>(data: T) -> (StatusCode, Json<ApiResponse<T>>) {
 }
 
 /// Helper to create a no content (204) response.
+#[must_use]
 pub fn no_content() -> StatusCode {
     StatusCode::NO_CONTENT
 }
