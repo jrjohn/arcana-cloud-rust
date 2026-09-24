@@ -1,6 +1,6 @@
 //! Redis job queue implementation.
 
-use super::{redis_index, RedisKeys};
+use super::{redis_index, redis_range_end, RedisKeys};
 use crate::config::JobsConfig;
 use crate::error::{JobError, JobResult};
 use crate::job::{Job, JobData, JobId, JobInfo};
@@ -454,11 +454,14 @@ impl JobQueue for RedisJobQueue {
     }
 
     async fn list_jobs(&self, queue: &str, limit: usize, offset: usize) -> JobResult<Vec<JobInfo>> {
+        let Some(end) = redis_range_end(offset, limit) else {
+            return Ok(Vec::new());
+        };
         let mut conn = self.conn().await?;
         let queue_key = self.keys.priority_queue(queue);
 
         let jobs: Vec<String> = conn
-            .zrange(&queue_key, redis_index(offset), redis_index(offset + limit - 1))
+            .zrange(&queue_key, redis_index(offset), end)
             .await?;
 
         let mut infos = Vec::with_capacity(jobs.len());
@@ -472,10 +475,13 @@ impl JobQueue for RedisJobQueue {
     }
 
     async fn list_dlq(&self, limit: usize, offset: usize) -> JobResult<Vec<JobInfo>> {
+        let Some(end) = redis_range_end(offset, limit) else {
+            return Ok(Vec::new());
+        };
         let mut conn = self.conn().await?;
 
         let jobs: Vec<String> = conn
-            .zrevrange(self.keys.dlq(), redis_index(offset), redis_index(offset + limit - 1))
+            .zrevrange(self.keys.dlq(), redis_index(offset), end)
             .await?;
 
         let mut infos = Vec::with_capacity(jobs.len());

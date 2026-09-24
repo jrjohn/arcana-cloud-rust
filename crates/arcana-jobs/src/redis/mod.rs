@@ -48,6 +48,19 @@ pub(crate) fn redis_index(index: usize) -> isize {
     isize::try_from(index).unwrap_or(isize::MAX)
 }
 
+/// Inclusive end index for a Redis range of `limit` items starting at `offset`,
+/// or `None` when `limit` is 0.
+///
+/// `offset + limit - 1` underflows for `limit == 0`: a debug build panics and a
+/// release build wraps to `usize::MAX`, which `ZRANGE offset <huge>` turns into
+/// "everything from `offset` on" instead of no items. Callers return an empty
+/// result on `None` without querying Redis.
+pub(crate) fn redis_range_end(offset: usize, limit: usize) -> Option<isize> {
+    limit
+        .checked_sub(1)
+        .map(|last| redis_index(offset.saturating_add(last)))
+}
+
 /// Redis key builder for job queue.
 pub struct RedisKeys {
     prefix: String,
@@ -142,6 +155,20 @@ impl Default for RedisKeys {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn redis_range_end_is_none_for_zero_limit() {
+        assert_eq!(redis_range_end(0, 0), None);
+        assert_eq!(redis_range_end(10, 0), None);
+    }
+
+    #[test]
+    fn redis_range_end_is_inclusive_and_saturates() {
+        assert_eq!(redis_range_end(0, 1), Some(0));
+        assert_eq!(redis_range_end(10, 5), Some(14));
+        assert_eq!(redis_range_end(usize::MAX, 5), Some(isize::MAX));
+    }
+
     use super::*;
 
     #[test]

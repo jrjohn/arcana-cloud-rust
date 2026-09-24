@@ -3,7 +3,7 @@
 use crate::error::JobResult;
 use crate::job::{JobInfo, JobStatus};
 use crate::queue::QueueStats;
-use crate::redis::{redis_index, RedisKeys};
+use crate::redis::{redis_index, redis_range_end, RedisKeys};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use deadpool_redis::Pool;
 use redis::AsyncCommands;
@@ -101,14 +101,12 @@ impl JobStatusTracker {
             }
         };
 
-        // Get job IDs from the set
-        let job_ids: Vec<String> = conn
-            .zrange(
-                &set_key,
-                redis_index(query.offset),
-                redis_index(query.offset + query.limit - 1),
-            )
-            .await?;
+        // Get job IDs from the set. limit == 0 fetches no jobs but still reports
+        // `total` below, so callers can ask for just the count.
+        let job_ids: Vec<String> = match redis_range_end(query.offset, query.limit) {
+            Some(end) => conn.zrange(&set_key, redis_index(query.offset), end).await?,
+            None => Vec::new(),
+        };
 
         // Get job data for each ID
         let mut jobs = Vec::new();
@@ -265,18 +263,21 @@ impl JobStatusTracker {
     /// `JobError::Redis` if a Redis command fails, or `JobError::Serialization`
     /// if a recent job is not a valid serialized [`JobInfo`].
     pub async fn get_recent_activity(&self, limit: usize) -> JobResult<Vec<JobActivity>> {
+        let Some(end) = redis_range_end(0, limit) else {
+            return Ok(Vec::new());
+        };
         let mut conn = self.pool.get().await?;
 
         // Get recently completed jobs
         let completed_key = self.keys.completed();
         let completed_ids: Vec<String> = conn
-            .zrevrange(&completed_key, 0, redis_index(limit - 1))
+            .zrevrange(&completed_key, 0, end)
             .await?;
 
         // Get recently failed jobs
         let dlq_key = self.keys.dlq();
         let failed_ids: Vec<String> = conn
-            .zrevrange(&dlq_key, 0, redis_index(limit - 1))
+            .zrevrange(&dlq_key, 0, end)
             .await?;
 
         let mut activities = Vec::new();

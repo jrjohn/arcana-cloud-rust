@@ -73,22 +73,20 @@ impl RetryPolicy {
     ///
     /// # Errors
     ///
-    /// Returns the error from the last attempt if all `max_attempts` calls of
-    /// `f` fail.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `max_attempts` is 0, since no attempt is made and there is no
-    /// error to return.
+    /// Returns the error from the last attempt if all calls of `f` fail. `f` is
+    /// called `max_attempts` times, and always at least once: `max_attempts == 0`
+    /// is treated as a single attempt with no retries (it used to panic, because
+    /// there was no error to return).
     pub async fn execute<F, Fut, T, E>(&self, mut f: F) -> Result<T, E>
     where
         F: FnMut() -> Fut,
         Fut: std::future::Future<Output = Result<T, E>>,
         E: std::fmt::Display,
     {
-        let mut last_error = None;
+        let attempts = self.max_attempts.max(1);
+        let mut attempt = 0;
 
-        for attempt in 0..self.max_attempts {
+        loop {
             if attempt > 0 {
                 let delay = self.delay_for_attempt(attempt);
                 debug!("Retry attempt {} after {:?}", attempt, delay);
@@ -99,12 +97,13 @@ impl RetryPolicy {
                 Ok(result) => return Ok(result),
                 Err(e) => {
                     debug!("Attempt {} failed: {}", attempt + 1, e);
-                    last_error = Some(e);
+                    attempt += 1;
+                    if attempt >= attempts {
+                        return Err(e);
+                    }
                 }
             }
         }
-
-        Err(last_error.expect("at least one attempt should have been made"))
     }
 }
 
@@ -250,5 +249,28 @@ mod tests {
         let policy = RetryPolicy::with_max_attempts(1);
         let result: Result<i32, &str> = policy.execute(|| async { Err("fail") }).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_zero_max_attempts_runs_once_instead_of_panicking() {
+        let policy = RetryPolicy {
+            max_attempts: 0,
+            ..RetryPolicy::default()
+        };
+        let calls = Arc::new(AtomicU32::new(0));
+        let c = calls.clone();
+
+        let result: Result<(), String> = policy
+            .execute(|| {
+                let c = c.clone();
+                async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                    Err("boom".to_string())
+                }
+            })
+            .await;
+
+        assert_eq!(result, Err("boom".to_string()));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }
