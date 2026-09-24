@@ -367,8 +367,10 @@ impl From<JobData> for JobInfo {
 /// Job status enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum JobStatus {
     /// Job is pending execution.
+    #[default]
     Pending,
     /// Job is scheduled for later execution.
     Scheduled,
@@ -384,11 +386,6 @@ pub enum JobStatus {
     Cancelled,
 }
 
-impl Default for JobStatus {
-    fn default() -> Self {
-        JobStatus::Pending
-    }
-}
 
 impl fmt::Display for JobStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -138,7 +138,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
         debug!("gRPC FindAllUsers");
 
         let page_request = req.page.map_or_else(
-            || PageRequest::default(),
+            PageRequest::default,
             |p| PageRequest::new(p.page as usize, p.size as usize),
         );
 
@@ -160,7 +160,7 @@ impl repository::repository_service_server::RepositoryService for RepositoryGrpc
 
         let role = from_proto_role(user_proto::UserRole::try_from(req.role).unwrap_or(user_proto::UserRole::User));
         let page_request = req.page.map_or_else(
-            || PageRequest::default(),
+            PageRequest::default,
             |p| PageRequest::new(p.page as usize, p.size as usize),
         );
 
@@ -326,13 +326,13 @@ fn from_proto_user_data(user: &repository::UserData) -> User {
         .created_at
         .as_ref()
         .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
-        .unwrap_or_else(|| chrono::Utc::now());
+        .unwrap_or_else(chrono::Utc::now);
 
     let updated_at = user
         .updated_at
         .as_ref()
         .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
-        .unwrap_or_else(|| chrono::Utc::now());
+        .unwrap_or_else(chrono::Utc::now);
 
     let last_login_at = user
         .last_login_at

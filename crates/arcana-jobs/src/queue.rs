@@ -11,10 +11,12 @@ use std::time::Duration;
 /// Job priority levels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(i8)]
+#[derive(Default)]
 pub enum Priority {
     /// Low priority (background tasks).
     Low = -10,
     /// Normal priority (default).
+    #[default]
     Normal = 0,
     /// High priority (important tasks).
     High = 10,
@@ -22,11 +24,6 @@ pub enum Priority {
     Critical = 20,
 }
 
-impl Default for Priority {
-    fn default() -> Self {
-        Priority::Normal
-    }
-}
 
 impl From<i8> for Priority {
     fn from(value: i8) -> Self {

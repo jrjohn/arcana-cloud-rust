@@ -48,7 +48,7 @@ impl RedisJobQueue {
 
         // Get jobs ready to be processed
         let jobs: Vec<String> = conn
-            .zrangebyscore(&self.keys.delayed(), 0i64, now)
+            .zrangebyscore(self.keys.delayed(), 0i64, now)
             .await?;
 
         let mut moved = 0u64;
@@ -60,7 +60,7 @@ impl RedisJobQueue {
                 let score = Self::priority_score(job_data.priority, job_data.scheduled_at.timestamp_millis());
 
                 let _: () = redis::pipe()
-                    .zrem(&self.keys.delayed(), &job_json)
+                    .zrem(self.keys.delayed(), &job_json)
                     .zadd(&queue_key, &job_json, score)
                     .query_async(&mut *conn)
                     .await?;
@@ -84,7 +84,7 @@ impl RedisJobQueue {
 
         // Get all active jobs
         let active_jobs: std::collections::HashMap<String, String> =
-            conn.hgetall(&self.keys.active()).await?;
+            conn.hgetall(self.keys.active()).await?;
 
         let mut recovered = 0u64;
 
@@ -107,7 +107,7 @@ impl RedisJobQueue {
                         self.retry(&job_data).await?;
 
                         // Remove from active
-                        let _: () = conn.hdel(&self.keys.active(), &job_id).await?;
+                        let _: () = conn.hdel(self.keys.active(), &job_id).await?;
 
                         recovered += 1;
                         warn!(job_id = %job_id, worker_id = %worker_id, "Recovered stale job from dead worker");
@@ -161,7 +161,7 @@ impl JobQueue for RedisJobQueue {
             // Delayed job - add to delayed queue
             let score = job_data.scheduled_at.timestamp_millis() as f64;
             let _: () = conn
-                .zadd(&self.keys.delayed(), &job_json, score)
+                .zadd(self.keys.delayed(), &job_json, score)
                 .await?;
 
             debug!(
@@ -211,7 +211,7 @@ impl JobQueue for RedisJobQueue {
 
                         // Mark as active
                         let _: () = conn
-                            .hset(&self.keys.active(), job_data.id.as_str(), worker_id)
+                            .hset(self.keys.active(), job_data.id.as_str(), worker_id)
                             .await?;
 
                         debug!(
@@ -239,7 +239,7 @@ impl JobQueue for RedisJobQueue {
         let mut conn = self.conn().await?;
 
         // Remove from active
-        let _: () = conn.hdel(&self.keys.active(), job_id.as_str()).await?;
+        let _: () = conn.hdel(self.keys.active(), job_id.as_str()).await?;
 
         // Get job data for stats
         let job_key = self.keys.job(job_id.as_str());
@@ -250,7 +250,7 @@ impl JobQueue for RedisJobQueue {
                 // Add to completed set
                 let now = Utc::now().timestamp_millis();
                 let _: () = conn
-                    .zadd(&self.keys.completed(), &json, now as f64)
+                    .zadd(self.keys.completed(), &json, now as f64)
                     .await?;
 
                 // Update stats
@@ -259,7 +259,7 @@ impl JobQueue for RedisJobQueue {
 
                 // Clear unique key if set
                 if let Some(unique_key) = &job_data.unique_key {
-                    let _: () = conn.del(&self.keys.unique(unique_key)).await?;
+                    let _: () = conn.del(self.keys.unique(unique_key)).await?;
                 }
             }
         }
@@ -301,7 +301,7 @@ impl JobQueue for RedisJobQueue {
             }
 
             // Remove from active
-            let _: () = conn.hdel(&self.keys.active(), job_id.as_str()).await?;
+            let _: () = conn.hdel(self.keys.active(), job_id.as_str()).await?;
 
             // Update stats
             let stats_key = self.keys.stats(&job_data.queue);
@@ -337,7 +337,7 @@ impl JobQueue for RedisJobQueue {
 
         // Add to delayed queue
         let score = scheduled_at.timestamp_millis() as f64;
-        let _: () = conn.zadd(&self.keys.delayed(), &job_json, score).await?;
+        let _: () = conn.zadd(self.keys.delayed(), &job_json, score).await?;
 
         debug!(
             job_id = %job_data.id,
@@ -367,7 +367,7 @@ impl JobQueue for RedisJobQueue {
         let now = Utc::now().timestamp_millis();
 
         // Add to DLQ
-        let _: () = conn.zadd(&self.keys.dlq(), &job_json, now as f64).await?;
+        let _: () = conn.zadd(self.keys.dlq(), &job_json, now as f64).await?;
 
         // Update job data
         let job_key = self.keys.job(job_data.id.as_str());
@@ -399,7 +399,7 @@ impl JobQueue for RedisJobQueue {
 
             // Check if active
             let worker_id: Option<String> = conn
-                .hget(&self.keys.active(), job_id.as_str())
+                .hget(self.keys.active(), job_id.as_str())
                 .await?;
 
             if worker_id.is_some() {
@@ -442,7 +442,7 @@ impl JobQueue for RedisJobQueue {
         let mut conn = self.conn().await?;
 
         let jobs: Vec<String> = conn
-            .zrevrange(&self.keys.dlq(), offset as isize, (offset + limit - 1) as isize)
+            .zrevrange(self.keys.dlq(), offset as isize, (offset + limit - 1) as isize)
             .await?;
 
         let mut infos = Vec::with_capacity(jobs.len());
@@ -475,7 +475,7 @@ impl JobQueue for RedisJobQueue {
             let updated_json = job_data.to_json()?;
 
             // Remove from DLQ
-            let _: () = conn.zrem(&self.keys.dlq(), &json).await?;
+            let _: () = conn.zrem(self.keys.dlq(), &json).await?;
 
             // Add to queue
             let queue_key = self.keys.priority_queue(&job_data.queue);
@@ -508,16 +508,16 @@ impl JobQueue for RedisJobQueue {
                 let _: () = redis::pipe()
                     .del(&job_key)
                     .zrem(&queue_key, &json)
-                    .zrem(&self.keys.delayed(), &json)
-                    .zrem(&self.keys.dlq(), &json)
-                    .zrem(&self.keys.completed(), &json)
-                    .hdel(&self.keys.active(), job_id.as_str())
+                    .zrem(self.keys.delayed(), &json)
+                    .zrem(self.keys.dlq(), &json)
+                    .zrem(self.keys.completed(), &json)
+                    .hdel(self.keys.active(), job_id.as_str())
                     .query_async(&mut *conn)
                     .await?;
 
                 // Clear unique key if set
                 if let Some(unique_key) = &job_data.unique_key {
-                    let _: () = conn.del(&self.keys.unique(unique_key)).await?;
+                    let _: () = conn.del(self.keys.unique(unique_key)).await?;
                 }
             }
         }
@@ -535,7 +535,7 @@ impl JobQueue for RedisJobQueue {
 
         // Remove old completed jobs using raw command
         let removed: u64 = redis::cmd("ZREMRANGEBYSCORE")
-            .arg(&self.keys.completed())
+            .arg(self.keys.completed())
             .arg(0i64)
             .arg(threshold_ms)
             .query_async(&mut *conn)
@@ -560,7 +560,7 @@ impl JobQueue for RedisJobQueue {
 
             // Check if active - can't cancel active jobs
             let is_active: bool = conn
-                .hexists(&self.keys.active(), job_id.as_str())
+                .hexists(self.keys.active(), job_id.as_str())
                 .await?;
 
             if is_active {
@@ -576,13 +576,13 @@ impl JobQueue for RedisJobQueue {
             let _: () = redis::pipe()
                 .del(&job_key)
                 .zrem(&queue_key, &json)
-                .zrem(&self.keys.delayed(), &json)
+                .zrem(self.keys.delayed(), &json)
                 .query_async(&mut *conn)
                 .await?;
 
             // Clear unique key if set
             if let Some(unique_key) = &job_data.unique_key {
-                let _: () = conn.del(&self.keys.unique(unique_key)).await?;
+                let _: () = conn.del(self.keys.unique(unique_key)).await?;
             }
 
             info!(job_id = %job_id, "Cancelled job");

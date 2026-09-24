@@ -73,7 +73,7 @@ impl UserService for RemoteUserServiceClient {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let user = response
             .into_inner()
@@ -93,7 +93,7 @@ impl UserService for RemoteUserServiceClient {
                 username: username.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let user = response
             .into_inner()
@@ -117,7 +117,7 @@ impl UserService for RemoteUserServiceClient {
                 role_filter: None,
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let inner = response.into_inner();
         let page_info = inner.page_info.unwrap_or_default();
@@ -144,7 +144,7 @@ impl UserService for RemoteUserServiceClient {
                 avatar_url: request.avatar_url,
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let user = response
             .into_inner()
@@ -165,7 +165,7 @@ impl UserService for RemoteUserServiceClient {
                 role: to_proto_role(request.role) as i32,
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let user = response
             .into_inner()
@@ -187,7 +187,7 @@ impl UserService for RemoteUserServiceClient {
                 reason: request.reason,
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let user = response
             .into_inner()
@@ -211,7 +211,7 @@ impl UserService for RemoteUserServiceClient {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(())
     }
@@ -224,7 +224,7 @@ impl UserService for RemoteUserServiceClient {
                 username: username.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().exists)
     }
@@ -237,7 +237,7 @@ impl UserService for RemoteUserServiceClient {
                 email: email.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().exists)
     }
@@ -278,16 +278,16 @@ fn from_proto_user(user: &user::User) -> UserResponse {
         avatar_url: user.avatar_url.clone(),
         last_login_at: user.last_login_at.as_ref().map(|t| {
             chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32)
-                .unwrap_or_else(|| chrono::Utc::now())
+                .unwrap_or_else(chrono::Utc::now)
         }),
         created_at: user
             .created_at
             .as_ref()
             .map(|t| {
                 chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32)
-                    .unwrap_or_else(|| chrono::Utc::now())
+                    .unwrap_or_else(chrono::Utc::now)
             })
-            .unwrap_or_else(|| chrono::Utc::now()),
+            .unwrap_or_else(chrono::Utc::now),
     }
 }
 

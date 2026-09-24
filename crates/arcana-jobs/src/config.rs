@@ -5,6 +5,7 @@ use std::time::Duration;
 
 /// Configuration for the job queue system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct JobsConfig {
     /// Whether this process runs the job subsystem at all.
     ///
@@ -32,17 +33,6 @@ pub struct JobsConfig {
     pub scheduler: SchedulerConfig,
 }
 
-impl Default for JobsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            redis: RedisConfig::default(),
-            worker: WorkerConfig::default(),
-            queue: QueueConfig::default(),
-            scheduler: SchedulerConfig::default(),
-        }
-    }
-}
 
 /// Redis connection configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]

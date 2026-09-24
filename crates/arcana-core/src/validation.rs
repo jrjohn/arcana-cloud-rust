@@ -93,7 +93,7 @@ pub mod rules {
         {
             return Err(ValidationError::new("username_invalid_characters"));
         }
-        if !username.chars().next().map_or(false, |c| c.is_alphabetic()) {
+        if !username.chars().next().is_some_and(|c| c.is_alphabetic()) {
             return Err(ValidationError::new("username_must_start_with_letter"));
         }
         Ok(())

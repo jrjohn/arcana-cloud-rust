@@ -5,7 +5,7 @@ use crate::dto::{
     AuthResponse, AuthUserInfo, LoginRequest, MessageResponse, RefreshTokenRequest, RegisterRequest,
 };
 use arcana_config::SecurityConfig;
-use arcana_core::{ArcanaError, ArcanaResult, Interface, UserId, ValidateExt};
+use arcana_core::{ArcanaError, ArcanaResult, UserId, ValidateExt};
 use arcana_core::{Email, User, UserStatus};
 use arcana_repository::UserRepository;
 use arcana_security::{Claims, PasswordHasher, PasswordHasherInterface, TokenProvider, TokenProviderInterface};
