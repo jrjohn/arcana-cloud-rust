@@ -9,9 +9,23 @@
 //   * `dir("${env.PROJECTS_DIR}/...")` blocks removed  — multibranch uses workspace root
 
 pipeline {
-    agent any
+    // agent none at the top: the executor is taken by the "Rust CI" wrapper stage below,
+    // i.e. only AFTER lock('ci-rust-build') is acquired, so a build waiting for the lock
+    // holds no executor (same shape as android #83 / springboot #176).
+    agent none
 
     options {
+        // Serialize ALL rust builds (every branch + PR) on the shared CI host.
+        // disableConcurrentBuilds() below is per-branch only. On 2026-09-24 rust PR-124,
+        // PR-125 and main #534 compiled concurrently from 01:01-01:16 alongside a springboot
+        // integration run; from ~02:20 the 23 GB host went into swap thrash (cron jobs
+        // started but never finished, docker stopped answering, sshd could not even send
+        // its banner) and stayed hung until a manual reboot at 10:24 — PR-124 "ran" 569 min
+        // past its 180 min timeout because Jenkins itself was frozen. Android and springboot
+        // were serialized for the same reason (ci-android-build / ci-springboot-build).
+        // lock MUST stay BEFORE timeout: options nest in declaration order, so the timeout
+        // starts only after the lock is acquired and lock-wait never counts toward it.
+        lock('ci-rust-build')
         timeout(time: 180, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '1'))
         disableConcurrentBuilds()
@@ -27,6 +41,10 @@ pipeline {
     }
 
     stages {
+      stage("Rust CI") {
+        // Single executor for the whole build, allocated inside the lock (top-level agent none).
+        agent any
+        stages {
         stage("Checkout") {
             steps {
                 checkout scm
@@ -341,21 +359,23 @@ pipeline {
                 }
             }
         }
-    }
-
-    post {
-        success {
-            echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION} branch=${env.BRANCH_NAME ?: '?'} pr=${env.CHANGE_ID ?: 'no'}"
-            sh '''
-                # self-clean: keep only THIS build's image locally; previous
-                # build-N tags stay pullable from the registry
-                docker images --format '{{.Repository}}:{{.Tag}}' \
-                    | grep -E "^${IMAGE_TAG}:build-[0-9]+$" \
-                    | grep -v ":build-${BUILD_NUMBER}$" \
-                    | xargs -r docker rmi 2>/dev/null || true
-            '''
         }
-        failure { echo "Pipeline FAILED - branch=${env.BRANCH_NAME ?: '?'} pr=${env.CHANGE_ID ?: 'no'}" }
-        always  { echo "Build number ${BUILD_NUMBER} done" }
+      // post runs on the stage's executor (its sh steps need a node; top-level has none)
+      post {
+          success {
+              echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION} branch=${env.BRANCH_NAME ?: '?'} pr=${env.CHANGE_ID ?: 'no'}"
+              sh '''
+                  # self-clean: keep only THIS build's image locally; previous
+                  # build-N tags stay pullable from the registry
+                  docker images --format '{{.Repository}}:{{.Tag}}' \
+                      | grep -E "^${IMAGE_TAG}:build-[0-9]+$" \
+                      | grep -v ":build-${BUILD_NUMBER}$" \
+                      | xargs -r docker rmi 2>/dev/null || true
+              '''
+          }
+          failure { echo "Pipeline FAILED - branch=${env.BRANCH_NAME ?: '?'} pr=${env.CHANGE_ID ?: 'no'}" }
+          always  { echo "Build number ${BUILD_NUMBER} done" }
+      }
+      }
     }
 }
