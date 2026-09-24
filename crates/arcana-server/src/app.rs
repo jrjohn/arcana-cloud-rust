@@ -29,6 +29,7 @@ impl AppBuilder {
     /// Currently never returns an error: startup logic is not implemented yet.
     #[allow(
         clippy::unused_async,
+        clippy::unused_async_trait_impl,
         reason = "public async API kept stable; real application startup will await"
     )]
     pub async fn run(self) -> ArcanaResult<()> {

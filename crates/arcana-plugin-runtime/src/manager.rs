@@ -40,6 +40,7 @@ impl PluginManager {
     /// and cannot be created, or if it exists but cannot be read.
     #[allow(
         clippy::unused_async,
+        clippy::unused_async_trait_impl,
         reason = "public async API kept stable; real WASM plugin loading will await"
     )]
     pub async fn initialize(&self) -> ArcanaResult<()> {

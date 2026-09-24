@@ -1,0 +1,10 @@
+# Single Rust version for local builds and CI. The CI images (Dockerfile.ci,
+# Dockerfile.coverage) and deployment images use the same rust:<version> tag, so
+# `cargo clippy -- -D warnings` sees the same lints everywhere. A floating
+# rust:latest turned PR-129 red on 2026-09-24 when Rust 1.98 added
+# clippy::unused_async_trait_impl while local builds were still on 1.97.
+# Renovate bumps this file and the Dockerfiles together in one PR; fix any new
+# lints in that PR.
+[toolchain]
+channel = "1.98.0"
+components = ["clippy", "rustfmt"]

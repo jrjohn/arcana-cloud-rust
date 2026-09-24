@@ -48,6 +48,7 @@ impl SsrEngine {
     /// The `Result` is kept for when loading JS runtimes and bundles can fail.
     #[allow(
         clippy::unused_async,
+        clippy::unused_async_trait_impl,
         reason = "public async API kept stable; the real runtime-pool setup will await"
     )]
     pub async fn initialize(&self) -> ArcanaResult<()> {
@@ -77,6 +78,7 @@ impl SsrEngine {
     /// the configuration.
     #[allow(
         clippy::unused_async,
+        clippy::unused_async_trait_impl,
         reason = "public async API kept stable; the real render will await a pooled JS runtime"
     )]
     pub async fn render(&self, request: RenderRequest) -> ArcanaResult<RenderResponse> {

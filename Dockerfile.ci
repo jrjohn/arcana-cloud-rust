@@ -2,7 +2,7 @@
 # Rust Multi-Stage Dockerfile (CI)
 # Workspace — build arcana-server only
 # ============================================
-FROM rust:latest AS builder
+FROM rust:1.98.0 AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev protobuf-compiler && rm -rf /var/lib/apt/lists/*
 # clippy is not part of the rust image; the test lane runs it to produce the JSON report

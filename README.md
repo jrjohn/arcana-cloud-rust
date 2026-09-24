@@ -941,6 +941,8 @@ Clippy is part of the build, not a report. The rules live in `Cargo.toml` under 
 | `clippy::pedantic` | warn | same command — any warning fails the build |
 | `unsafe_code` | warn | same command |
 
+The Rust version is pinned in `rust-toolchain.toml` and every `FROM rust:<version>` uses the same tag, so local runs and CI see exactly the same lints. Renovate bumps them together in one "Rust toolchain" PR; any new lints are fixed in that PR.
+
 Run it locally before pushing:
 
 ```bash
