@@ -68,12 +68,14 @@ impl<J: Job> QueuedJob<J> {
     }
 
     /// Set the priority.
+    #[must_use]
     pub fn priority(mut self, priority: Priority) -> Self {
         self.priority = priority;
         self
     }
 
     /// Set a delay before execution.
+    #[must_use]
     pub fn delay(mut self, delay: Duration) -> Self {
         self.delay = Some(delay);
         self.scheduled_at = None;
@@ -81,6 +83,7 @@ impl<J: Job> QueuedJob<J> {
     }
 
     /// Schedule for a specific time.
+    #[must_use]
     pub fn at(mut self, scheduled_at: DateTime<Utc>) -> Self {
         self.scheduled_at = Some(scheduled_at);
         self.delay = None;
@@ -88,30 +91,39 @@ impl<J: Job> QueuedJob<J> {
     }
 
     /// Set correlation ID for tracing.
+    #[must_use]
     pub fn correlation_id(mut self, id: impl Into<String>) -> Self {
         self.correlation_id = Some(id.into());
         self
     }
 
     /// Add a tag.
+    #[must_use]
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(tag.into());
         self
     }
 
     /// Add multiple tags.
+    #[must_use]
     pub fn tags(mut self, tags: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        self.tags.extend(tags.into_iter().map(|t| t.into()));
+        self.tags.extend(tags.into_iter().map(std::convert::Into::into));
         self
     }
 
     /// Override the retry policy.
+    #[must_use]
     pub fn with_retry(mut self, policy: RetryPolicy) -> Self {
         self.retry_policy = Some(policy);
         self
     }
 
     /// Build the job data.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Serialization`] if the job payload or the retry
+    /// policy (default or overridden) cannot be serialized to JSON.
     pub fn build(self) -> JobResult<JobData> {
         let mut data = JobData::new(&self.job)?;
 

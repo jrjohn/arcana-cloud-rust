@@ -6,6 +6,11 @@ use validator::{Validate, ValidationErrors};
 /// Extension trait for validation.
 pub trait ValidateExt: Validate {
     /// Validates the struct and returns an `ArcanaError` on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Validation`] listing every failing field as
+    /// `field: message` if `validate()` reports any errors.
     fn validate_request(&self) -> Result<(), ArcanaError> {
         self.validate().map_err(validation_errors_to_arcana_error)
     }
@@ -15,6 +20,10 @@ impl<T: Validate> ValidateExt for T {}
 
 /// Converts `validator::ValidationErrors` to `ArcanaError`.
 #[must_use]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "public API used as a `map_err` function pointer on `validate()` results; taking a reference would change its signature"
+)]
 pub fn validation_errors_to_arcana_error(errors: ValidationErrors) -> ArcanaError {
     let field_errors: Vec<FieldError> = errors
         .field_errors()
@@ -25,7 +34,7 @@ pub fn validation_errors_to_arcana_error(errors: ValidationErrors) -> ArcanaErro
                 message: error
                     .message
                     .as_ref()
-                    .map_or_else(|| error.code.to_string(), |m| m.to_string()),
+                    .map_or_else(|| error.code.to_string(), std::string::ToString::to_string),
                 code: error.code.to_string(),
             })
         })
@@ -45,6 +54,10 @@ pub mod rules {
     use validator::ValidationError;
 
     /// Validates that a string is not blank (not empty after trimming).
+    ///
+    /// # Errors
+    ///
+    /// Returns `not_blank` if `value` is empty or only whitespace.
     pub fn not_blank(value: &str) -> Result<(), ValidationError> {
         if value.trim().is_empty() {
             return Err(ValidationError::new("not_blank"));
@@ -53,13 +66,20 @@ pub mod rules {
     }
 
     /// Validates that a password meets complexity requirements.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first failing rule, checked in this order:
+    /// `password_too_short` (fewer than 8 bytes), `password_missing_uppercase`,
+    /// `password_missing_lowercase`, `password_missing_digit` (ASCII digit),
+    /// `password_missing_special` (any non-alphanumeric character).
     pub fn password_complexity(password: &str) -> Result<(), ValidationError> {
         if password.len() < 8 {
             return Err(ValidationError::new("password_too_short"));
         }
 
-        let has_uppercase = password.chars().any(|c| c.is_uppercase());
-        let has_lowercase = password.chars().any(|c| c.is_lowercase());
+        let has_uppercase = password.chars().any(char::is_uppercase);
+        let has_lowercase = password.chars().any(char::is_lowercase);
         let has_digit = password.chars().any(|c| c.is_ascii_digit());
         let has_special = password.chars().any(|c| !c.is_alphanumeric());
 
@@ -80,6 +100,13 @@ pub mod rules {
     }
 
     /// Validates that a username meets requirements.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first failing rule, checked in this order:
+    /// `username_too_short` (fewer than 3 bytes), `username_too_long` (more than
+    /// 32 bytes), `username_invalid_characters` (anything other than alphanumerics,
+    /// `_` or `-`), `username_must_start_with_letter`.
     pub fn valid_username(username: &str) -> Result<(), ValidationError> {
         if username.len() < 3 {
             return Err(ValidationError::new("username_too_short"));
@@ -93,13 +120,19 @@ pub mod rules {
         {
             return Err(ValidationError::new("username_invalid_characters"));
         }
-        if !username.chars().next().is_some_and(|c| c.is_alphabetic()) {
+        if !username.chars().next().is_some_and(char::is_alphabetic) {
             return Err(ValidationError::new("username_must_start_with_letter"));
         }
         Ok(())
     }
 
     /// Validates a plugin key format.
+    ///
+    /// # Errors
+    ///
+    /// Returns `plugin_key_empty` for an empty key, `plugin_key_too_long` for
+    /// more than 64 bytes, or `plugin_key_invalid_characters` if it contains
+    /// anything other than alphanumerics, `-` or `_`.
     pub fn valid_plugin_key(key: &str) -> Result<(), ValidationError> {
         if key.is_empty() {
             return Err(ValidationError::new("plugin_key_empty"));

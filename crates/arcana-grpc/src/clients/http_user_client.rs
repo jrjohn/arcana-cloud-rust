@@ -27,13 +27,18 @@ pub struct HttpUserServiceClient {
 
 impl HttpUserServiceClient {
     /// Creates a new HTTP user service client.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Internal` if the underlying `reqwest` client cannot be built
+    /// (e.g. the TLS backend fails to initialize).
     pub fn new(base_url: &str) -> ArcanaResult<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(100)
             .pool_idle_timeout(Duration::from_secs(90))
             .build()
-            .map_err(|e| ArcanaError::Internal(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             client,
@@ -42,6 +47,7 @@ impl HttpUserServiceClient {
     }
 
     /// Creates a new HTTP user service client with custom configuration.
+    #[must_use]
     pub fn with_client(client: Client, base_url: &str) -> Self {
         Self {
             client,
@@ -114,7 +120,7 @@ impl UserService for HttpUserServiceClient {
             .json(&http_request)
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         handle_response(response).await
     }
@@ -124,10 +130,10 @@ impl UserService for HttpUserServiceClient {
 
         let response = self
             .client
-            .get(self.url(&format!("/api/v1/users/{}", id)))
+            .get(self.url(&format!("/api/v1/users/{id}")))
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         handle_response(response).await
     }
@@ -137,10 +143,10 @@ impl UserService for HttpUserServiceClient {
 
         let response = self
             .client
-            .get(self.url(&format!("/api/v1/users/username/{}", username)))
+            .get(self.url(&format!("/api/v1/users/username/{username}")))
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         handle_response(response).await
     }
@@ -154,7 +160,7 @@ impl UserService for HttpUserServiceClient {
             .query(&[("page", page.page.to_string()), ("size", page.size.to_string())])
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
@@ -164,7 +170,7 @@ impl UserService for HttpUserServiceClient {
         let page_response: HttpPageResponse<UserResponse> = response
             .json()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {e}")))?;
 
         Ok(UserListResponse {
             users: page_response.data,
@@ -186,11 +192,11 @@ impl UserService for HttpUserServiceClient {
 
         let response = self
             .client
-            .patch(self.url(&format!("/api/v1/users/{}", id)))
+            .patch(self.url(&format!("/api/v1/users/{id}")))
             .json(&http_request)
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         handle_response(response).await
     }
@@ -204,11 +210,11 @@ impl UserService for HttpUserServiceClient {
 
         let response = self
             .client
-            .patch(self.url(&format!("/api/v1/users/{}/role", id)))
+            .patch(self.url(&format!("/api/v1/users/{id}/role")))
             .json(&http_request)
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         handle_response(response).await
     }
@@ -223,11 +229,11 @@ impl UserService for HttpUserServiceClient {
 
         let response = self
             .client
-            .patch(self.url(&format!("/api/v1/users/{}/status", id)))
+            .patch(self.url(&format!("/api/v1/users/{id}/status")))
             .json(&http_request)
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         handle_response(response).await
     }
@@ -242,10 +248,10 @@ impl UserService for HttpUserServiceClient {
 
         let response = self
             .client
-            .delete(self.url(&format!("/api/v1/users/{}", id)))
+            .delete(self.url(&format!("/api/v1/users/{id}")))
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
@@ -258,10 +264,10 @@ impl UserService for HttpUserServiceClient {
     async fn username_exists(&self, username: &str) -> ArcanaResult<bool> {
         let response = self
             .client
-            .get(self.url(&format!("/api/v1/users/username/{}/exists", username)))
+            .get(self.url(&format!("/api/v1/users/username/{username}/exists")))
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
@@ -271,7 +277,7 @@ impl UserService for HttpUserServiceClient {
         let exists_response: HttpExistsResponse = response
             .json()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {e}")))?;
 
         Ok(exists_response.exists)
     }
@@ -279,10 +285,10 @@ impl UserService for HttpUserServiceClient {
     async fn email_exists(&self, email: &str) -> ArcanaResult<bool> {
         let response = self
             .client
-            .get(self.url(&format!("/api/v1/users/email/{}/exists", email)))
+            .get(self.url(&format!("/api/v1/users/email/{email}/exists")))
             .send()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("HTTP error: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
@@ -292,13 +298,17 @@ impl UserService for HttpUserServiceClient {
         let exists_response: HttpExistsResponse = response
             .json()
             .await
-            .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {}", e)))?;
+            .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {e}")))?;
 
         Ok(exists_response.exists)
     }
 }
 
 /// Creates a shareable HTTP user service client.
+///
+/// # Errors
+///
+/// Returns `ArcanaError::Internal` if the underlying `reqwest` client cannot be built.
 pub fn create_http_user_service(base_url: &str) -> ArcanaResult<Arc<dyn UserService>> {
     let client = HttpUserServiceClient::new(base_url)?;
     Ok(Arc::new(client))
@@ -314,7 +324,7 @@ async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Resp
     response
         .json()
         .await
-        .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {}", e)))
+        .map_err(|e| ArcanaError::Internal(format!("JSON parse error: {e}")))
 }
 
 fn map_http_error(status: StatusCode, body: &str) -> ArcanaError {
@@ -327,7 +337,7 @@ fn map_http_error(status: StatusCode, body: &str) -> ArcanaError {
         StatusCode::CONFLICT => ArcanaError::Conflict(body.to_string()),
         StatusCode::UNAUTHORIZED => ArcanaError::InvalidCredentials,
         StatusCode::FORBIDDEN => ArcanaError::Forbidden(body.to_string()),
-        _ => ArcanaError::Internal(format!("HTTP error {}: {}", status, body)),
+        _ => ArcanaError::Internal(format!("HTTP error {status}: {body}")),
     }
 }
 

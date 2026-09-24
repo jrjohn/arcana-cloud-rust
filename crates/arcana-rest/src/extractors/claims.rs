@@ -46,6 +46,10 @@ where
 {
     type Rejection = AuthError;
 
+    #[allow(
+        clippy::unused_async_trait_impl,
+        reason = "axum's FromRequestParts is an async trait method; this extractor only reads request parts"
+    )]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         // Get the authorization header
         let auth_header = parts
@@ -92,6 +96,10 @@ where
 {
     type Rejection = std::convert::Infallible;
 
+    #[allow(
+        clippy::unused_async_trait_impl,
+        reason = "axum's FromRequestParts is an async trait method; this extractor only reads request parts"
+    )]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let claims = parts.extensions.get::<Claims>().cloned();
         Ok(OptionalUser(claims))

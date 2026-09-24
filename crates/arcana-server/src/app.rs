@@ -10,17 +10,28 @@ pub struct AppBuilder {
 
 impl AppBuilder {
     /// Creates a new application builder.
+    #[must_use]
     pub fn new() -> Self {
         Self { config: None }
     }
 
     /// Sets the configuration.
+    #[must_use]
     pub fn with_config(mut self, config: AppConfig) -> Self {
         self.config = Some(config);
         self
     }
 
     /// Builds and runs the application.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error: startup logic is not implemented yet.
+    #[allow(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "public async API kept stable; real application startup will await"
+    )]
     pub async fn run(self) -> ArcanaResult<()> {
         let _config = self.config.unwrap_or_default();
         // Application startup logic would go here

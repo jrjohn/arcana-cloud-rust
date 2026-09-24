@@ -49,6 +49,7 @@ impl Default for RetryPolicy {
 
 impl RetryPolicy {
     /// Creates a policy with no retries.
+    #[must_use]
     pub fn none() -> Self {
         Self {
             strategy: RetryStrategy::None,
@@ -62,6 +63,7 @@ impl RetryPolicy {
     }
 
     /// Creates a fixed delay retry policy.
+    #[must_use]
     pub fn fixed(max_retries: u32, delay_ms: u64) -> Self {
         Self {
             strategy: RetryStrategy::Fixed,
@@ -75,12 +77,13 @@ impl RetryPolicy {
     }
 
     /// Creates an exponential backoff retry policy.
+    #[must_use]
     pub fn exponential(max_retries: u32) -> Self {
         Self {
             strategy: RetryStrategy::Exponential,
             max_retries,
             initial_delay_ms: 1000, // 1 second
-            max_delay_ms: 3600000,  // 1 hour
+            max_delay_ms: 3_600_000, // 1 hour
             multiplier: 2.0,
             jitter: true,
             jitter_factor: 0.1,
@@ -88,12 +91,13 @@ impl RetryPolicy {
     }
 
     /// Creates a linear backoff retry policy.
+    #[must_use]
     pub fn linear(max_retries: u32, increment_ms: u64) -> Self {
         Self {
             strategy: RetryStrategy::Linear,
             max_retries,
             initial_delay_ms: increment_ms,
-            max_delay_ms: increment_ms * max_retries as u64,
+            max_delay_ms: increment_ms * u64::from(max_retries),
             multiplier: 1.0,
             jitter: false,
             jitter_factor: 0.0,
@@ -101,24 +105,28 @@ impl RetryPolicy {
     }
 
     /// Sets the initial delay.
+    #[must_use]
     pub fn with_initial_delay(mut self, delay: Duration) -> Self {
-        self.initial_delay_ms = delay.as_millis() as u64;
+        self.initial_delay_ms = u64::try_from(delay.as_millis()).unwrap_or(u64::MAX);
         self
     }
 
     /// Sets the maximum delay.
+    #[must_use]
     pub fn with_max_delay(mut self, delay: Duration) -> Self {
-        self.max_delay_ms = delay.as_millis() as u64;
+        self.max_delay_ms = u64::try_from(delay.as_millis()).unwrap_or(u64::MAX);
         self
     }
 
     /// Sets the backoff multiplier.
+    #[must_use]
     pub fn with_multiplier(mut self, multiplier: f64) -> Self {
         self.multiplier = multiplier;
         self
     }
 
     /// Enables jitter.
+    #[must_use]
     pub fn with_jitter(mut self, factor: f64) -> Self {
         self.jitter = true;
         self.jitter_factor = factor.clamp(0.0, 1.0);
@@ -126,6 +134,7 @@ impl RetryPolicy {
     }
 
     /// Disables jitter.
+    #[must_use]
     pub fn without_jitter(mut self) -> Self {
         self.jitter = false;
         self.jitter_factor = 0.0;
@@ -133,11 +142,13 @@ impl RetryPolicy {
     }
 
     /// Returns true if retries are allowed.
+    #[must_use]
     pub fn should_retry(&self, attempt: u32) -> bool {
         self.strategy != RetryStrategy::None && attempt <= self.max_retries
     }
 
     /// Calculate delay for the given attempt number.
+    #[must_use]
     pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
         if attempt == 0 || self.strategy == RetryStrategy::None {
             return Duration::ZERO;
@@ -147,12 +158,10 @@ impl RetryPolicy {
             RetryStrategy::None => 0,
             RetryStrategy::Fixed => self.initial_delay_ms,
             RetryStrategy::Exponential => {
-                let exp = attempt - 1;
-                let delay = self.initial_delay_ms as f64 * self.multiplier.powi(exp as i32);
-                delay as u64
+                exponential_delay_ms(self.initial_delay_ms, self.multiplier, attempt - 1)
             }
             RetryStrategy::Linear => {
-                self.initial_delay_ms * attempt as u64
+                self.initial_delay_ms * u64::from(attempt)
             }
         };
 
@@ -161,6 +170,12 @@ impl RetryPolicy {
 
         // Apply jitter if enabled
         let final_delay = if self.jitter && self.jitter_factor > 0.0 {
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "jitter is approximate by design; f64-to-u64 `as` saturates (negative/NaN -> 0), and the result is only used with saturating add/sub"
+            )]
             let jitter_range = (capped_delay as f64 * self.jitter_factor) as u64;
             let jitter = rand_jitter(jitter_range);
             capped_delay.saturating_add(jitter).saturating_sub(jitter_range / 2)
@@ -172,6 +187,18 @@ impl RetryPolicy {
     }
 }
 
+/// `initial_delay_ms * multiplier^exp`, computed in f64.
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "backoff math is done in f64 (precision loss above 2^52 ms is irrelevant); f64-to-u64 `as` saturates (negative/NaN -> 0, overflow -> u64::MAX) and the caller caps the result at max_delay_ms"
+)]
+fn exponential_delay_ms(initial_delay_ms: u64, multiplier: f64, exp: u32) -> u64 {
+    let exp = i32::try_from(exp).unwrap_or(i32::MAX);
+    (initial_delay_ms as f64 * multiplier.powi(exp)) as u64
+}
+
 /// Generate random jitter using a simple LCG.
 fn rand_jitter(range: u64) -> u64 {
     use std::time::SystemTime;
@@ -181,14 +208,18 @@ fn rand_jitter(range: u64) -> u64 {
     }
 
     // Simple pseudo-random based on time
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "only the low 64 bits of the nanosecond timestamp are needed as a PRNG seed"
+    )]
     let seed = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos() as u64;
 
     // LCG parameters
-    let a: u64 = 6364136223846793005;
-    let c: u64 = 1442695040888963407;
+    let a: u64 = 6_364_136_223_846_793_005;
+    let c: u64 = 1_442_695_040_888_963_407;
 
     let random = seed.wrapping_mul(a).wrapping_add(c);
     random % range

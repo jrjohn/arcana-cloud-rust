@@ -1,8 +1,8 @@
-//! UserDao trait — low-level user data access abstraction.
+//! `UserDao` trait — low-level user data access abstraction.
 //!
 //! This is the DAO (Data Access Object) interface for user data.
 //! Implementations connect directly to a single data source
-//! (MySQL, PostgreSQL, REST API, gRPC remote, etc.).
+//! (`MySQL`, `PostgreSQL`, REST API, gRPC remote, etc.).
 //!
 //! [`UserRepository`] uses one or more `UserDao` instances to
 //! fulfil domain-level operations.

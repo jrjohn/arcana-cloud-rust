@@ -5,6 +5,7 @@
 
 use crate::AppConfig;
 use std::fmt;
+use std::fmt::Write as _;
 use url::Url;
 
 /// Configuration validation error variants.
@@ -48,36 +49,32 @@ impl fmt::Display for ConfigValidationError {
             Self::JwtSecretTooShort { actual, minimum } => {
                 write!(
                     f,
-                    "JWT secret too short: {} characters (minimum {})",
-                    actual, minimum
+                    "JWT secret too short: {actual} characters (minimum {minimum})"
                 )
             }
             Self::InvalidPort { name, value } => {
-                write!(f, "Invalid port for {}: {} (must be 1-65535)", name, value)
+                write!(f, "Invalid port for {name}: {value} (must be 1-65535)")
             }
             Self::PortConflict { rest, grpc } => {
                 write!(
                     f,
-                    "REST port ({}) and gRPC port ({}) cannot be the same",
-                    rest, grpc
+                    "REST port ({rest}) and gRPC port ({grpc}) cannot be the same"
                 )
             }
             Self::InvalidPoolSize { min, max } => {
                 write!(
                     f,
-                    "Invalid pool size: min ({}) cannot be greater than max ({})",
-                    min, max
+                    "Invalid pool size: min ({min}) cannot be greater than max ({max})"
                 )
             }
             Self::PoolSizeTooLarge { value, maximum } => {
                 write!(
                     f,
-                    "Pool size {} exceeds maximum allowed ({})",
-                    value, maximum
+                    "Pool size {value} exceeds maximum allowed ({maximum})"
                 )
             }
             Self::InvalidUrl { url_type, message } => {
-                write!(f, "Invalid {} URL: {}", url_type, message)
+                write!(f, "Invalid {url_type} URL: {message}")
             }
             Self::MissingTlsCert => {
                 write!(f, "TLS certificate path required when gRPC TLS is enabled")
@@ -88,25 +85,22 @@ impl fmt::Display for ConfigValidationError {
             Self::InvalidSamplingRatio { value } => {
                 write!(
                     f,
-                    "Invalid sampling ratio: {} (must be between 0.0 and 1.0)",
-                    value
+                    "Invalid sampling ratio: {value} (must be between 0.0 and 1.0)"
                 )
             }
             Self::NonPositiveTimeout { name, value } => {
-                write!(f, "Timeout '{}' must be positive, got {}", name, value)
+                write!(f, "Timeout '{name}' must be positive, got {value}")
             }
             Self::InvalidHashCost { value, minimum, maximum } => {
                 write!(
                     f,
-                    "Invalid password hash cost: {} (must be between {} and {})",
-                    value, minimum, maximum
+                    "Invalid password hash cost: {value} (must be between {minimum} and {maximum})"
                 )
             }
             Self::InvalidLogLevel { value } => {
                 write!(
                     f,
-                    "Invalid log level: '{}' (valid: trace, debug, info, warn, error)",
-                    value
+                    "Invalid log level: '{value}' (valid: trace, debug, info, warn, error)"
                 )
             }
             Self::MissingServiceUrl => {
@@ -147,16 +141,23 @@ impl ValidationResult {
     }
 
     /// Returns true if validation passed (no errors).
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.errors.is_empty()
     }
 
     /// Returns the validation errors.
+    #[must_use]
     pub fn errors(&self) -> &[ConfigValidationError] {
         &self.errors
     }
 
     /// Converts to Result, returning Err with all errors if any exist.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` carrying every collected [`ConfigValidationError`] when at
+    /// least one error was recorded.
     pub fn into_result(self) -> Result<(), Vec<ConfigValidationError>> {
         if self.errors.is_empty() {
             Ok(())
@@ -184,6 +185,12 @@ impl ConfigValidator {
     /// Validates the entire application configuration.
     ///
     /// Returns Ok(()) if valid, or Err with all validation errors found.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` with every [`ConfigValidationError`] found across the server,
+    /// Redis, observability, deployment, SSR and plugin sections, plus the
+    /// security and database sections for non-job deployment roles.
     pub fn validate(config: &AppConfig) -> Result<(), Vec<ConfigValidationError>> {
         let mut result = ValidationResult::new();
 
@@ -378,7 +385,7 @@ impl ConfigValidator {
             if Url::parse(endpoint).is_err() {
                 result.add_error(ConfigValidationError::InvalidUrl {
                     url_type: "otlp_endpoint".to_string(),
-                    message: format!("Invalid URL format: {}", endpoint),
+                    message: format!("Invalid URL format: {endpoint}"),
                 });
             }
         }
@@ -420,7 +427,7 @@ impl ConfigValidator {
                     if Url::parse(url).is_err() {
                         result.add_error(ConfigValidationError::InvalidUrl {
                             url_type: "service_url".to_string(),
-                            message: format!("Invalid URL format: {}", url),
+                            message: format!("Invalid URL format: {url}"),
                         });
                     }
                 }
@@ -432,7 +439,7 @@ impl ConfigValidator {
                     if Url::parse(url).is_err() {
                         result.add_error(ConfigValidationError::InvalidUrl {
                             url_type: "repository_url".to_string(),
-                            message: format!("Invalid URL format: {}", url),
+                            message: format!("Invalid URL format: {url}"),
                         });
                     }
                 }
@@ -478,10 +485,11 @@ impl ConfigValidator {
 }
 
 /// Formats validation errors for display.
+#[must_use]
 pub fn format_validation_errors(errors: &[ConfigValidationError]) -> String {
     let mut output = String::from("Configuration validation failed:\n");
     for (i, error) in errors.iter().enumerate() {
-        output.push_str(&format!("  {}. {}\n", i + 1, error));
+        let _ = writeln!(output, "  {}. {}", i + 1, error);
     }
     output
 }

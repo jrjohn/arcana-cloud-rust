@@ -53,19 +53,24 @@ impl std::fmt::Debug for ScheduledJob {
             .field("enabled", &self.enabled)
             .field("timezone_offset_hours", &self.timezone_offset_hours)
             .field("next_run", &self.next_run)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl ScheduledJob {
     /// Create a new scheduled job.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Configuration`] if `cron_expr` is not a valid cron
+    /// expression.
     pub fn new<J: Job>(
         name: impl Into<String>,
         cron_expr: &str,
         job_factory: impl Fn() -> J + Send + Sync + 'static,
     ) -> JobResult<Self> {
         let schedule = Schedule::from_str(cron_expr)
-            .map_err(|e| JobError::Configuration(format!("Invalid cron expression: {}", e)))?;
+            .map_err(|e| JobError::Configuration(format!("Invalid cron expression: {e}")))?;
 
         let factory: Arc<dyn Fn() -> JobResult<JobData> + Send + Sync> =
             Arc::new(move || {
@@ -85,23 +90,31 @@ impl ScheduledJob {
     }
 
     /// Set whether the job is enabled.
+    #[must_use]
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     /// Set timezone offset in hours.
+    #[must_use]
     pub fn timezone_offset(mut self, hours: i32) -> Self {
         self.timezone_offset_hours = hours;
         self
     }
 
     /// Calculate the next run time from now.
+    #[must_use]
     pub fn next_run_from(&self, from: DateTime<Utc>) -> Option<DateTime<Utc>> {
         self.schedule.after(&from).next()
     }
 
     /// Create job data for execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Serialization`] if the job produced by the factory
+    /// (or its retry policy) cannot be serialized.
     pub fn create_job_data(&self) -> JobResult<JobData> {
         (self.factory)()
     }
@@ -188,6 +201,11 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Register a job with cron expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Configuration`] if `cron_expr` is not a valid cron
+    /// expression; nothing is registered in that case.
     pub fn schedule<J: Job>(
         &self,
         name: impl Into<String>,
@@ -200,16 +218,19 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Unregister a scheduled job.
+    #[must_use]
     pub fn unregister(&self, name: &str) -> Option<ScheduledJob> {
         self.jobs.write().remove(name)
     }
 
     /// Check if this instance is the leader.
+    #[must_use]
     pub fn is_leader(&self) -> bool {
         self.is_leader.load(Ordering::SeqCst)
     }
 
     /// Get scheduler ID.
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -218,7 +239,7 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     async fn try_acquire_leadership(&self) -> JobResult<bool> {
         let mut conn = self.pool.get().await?;
         let lock_key = self.keys.scheduler_lock();
-        let ttl_secs = self.config.leader_ttl_secs as i64;
+        let ttl_secs = i64::try_from(self.config.leader_ttl_secs).unwrap_or(i64::MAX);
 
         // Try to set lock with NX (only if not exists)
         let result: Option<String> = redis::cmd("SET")
@@ -280,6 +301,13 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Start the scheduler.
+    ///
+    /// Runs until [`Self::stop`] is called. Failures inside the loop
+    /// (leadership checks, enqueueing) are logged, not returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Configuration`] if the scheduler is already running.
     pub async fn start(&self) -> JobResult<()> {
         if self.running.swap(true, Ordering::SeqCst) {
             return Err(JobError::Configuration("Scheduler already running".to_string()));
@@ -452,13 +480,18 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Calculate priority score for sorted set ordering.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms"
+    )]
     fn calculate_priority_score(job_data: &JobData) -> f64 {
-        let priority_weight = -(job_data.priority as f64) * 1_000_000_000_000.0;
+        let priority_weight = -f64::from(job_data.priority) * 1_000_000_000_000.0;
         let time_weight = job_data.scheduled_at.timestamp_millis() as f64;
         priority_weight + time_weight
     }
 
     /// Get scheduler statistics.
+    #[must_use]
     pub fn stats(&self) -> SchedulerStats {
         SchedulerStats {
             id: self.id.clone(),
@@ -470,6 +503,7 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// List all registered scheduled jobs.
+    #[must_use]
     pub fn list_jobs(&self) -> Vec<ScheduledJobInfo> {
         let now = Utc::now();
         self.jobs
@@ -485,6 +519,7 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Enable a scheduled job.
+    #[must_use]
     pub fn enable_job(&self, name: &str) -> bool {
         if let Some(job) = self.jobs.write().get_mut(name) {
             job.enabled = true;
@@ -495,6 +530,7 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Disable a scheduled job.
+    #[must_use]
     pub fn disable_job(&self, name: &str) -> bool {
         if let Some(job) = self.jobs.write().get_mut(name) {
             job.enabled = false;
@@ -505,12 +541,20 @@ impl<Q: JobQueue + 'static> Scheduler<Q> {
     }
 
     /// Trigger a scheduled job immediately.
+    ///
+    /// # Errors
+    ///
+    /// - [`JobError::NotFound`] if no scheduled job is registered as `name`.
+    /// - [`JobError::Serialization`] if the job data cannot be created or
+    ///   serialized.
+    /// - [`JobError::Pool`] / [`JobError::Redis`] if storing or enqueueing the
+    ///   job in Redis fails.
     pub async fn trigger_job(&self, name: &str) -> JobResult<String> {
         let job_data = {
             let jobs = self.jobs.read();
             let scheduled_job = jobs
                 .get(name)
-                .ok_or_else(|| JobError::NotFound(format!("Scheduled job not found: {}", name)))?;
+                .ok_or_else(|| JobError::NotFound(format!("Scheduled job not found: {name}")))?;
 
             scheduled_job.create_job_data()?
         };

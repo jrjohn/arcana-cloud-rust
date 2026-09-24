@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub trait JobQueueInterface: Interface + Send + Sync {
     /// Get the underlying Redis job queue.
     ///
-    /// Returns the concrete RedisJobQueue type since JobQueue trait is not object-safe.
+    /// Returns the concrete `RedisJobQueue` type since `JobQueue` trait is not object-safe.
     fn redis_queue(&self) -> &RedisJobQueue;
 
     /// Get the status tracker.
@@ -83,7 +83,7 @@ pub trait JobQueueInterface: Interface + Send + Sync {
 
     /// Mark a job as failed.
     ///
-    /// Returns (retried, dead_lettered) indicating if the job was retried or moved to DLQ.
+    /// Returns (retried, `dead_lettered`) indicating if the job was retried or moved to DLQ.
     async fn fail_job(
         &self,
         job_id: &JobId,
@@ -109,6 +109,7 @@ pub struct JobQueueService {
 
 impl JobQueueService {
     /// Create a new job queue service.
+    #[must_use]
     pub fn new(
         redis_queue: Arc<RedisJobQueue>,
         status_tracker: JobStatusTracker,
@@ -161,12 +162,12 @@ impl JobQueueInterface for JobQueueService {
     }
 
     async fn get_all_queue_stats(&self) -> JobResult<Vec<QueueStats>> {
-        let names: Vec<&str> = self.queue_names.iter().map(|s| s.as_str()).collect();
+        let names: Vec<&str> = self.queue_names.iter().map(std::string::String::as_str).collect();
         self.status_tracker.get_all_stats(&names).await
     }
 
     async fn get_dashboard_stats(&self) -> JobResult<DashboardStats> {
-        let names: Vec<&str> = self.queue_names.iter().map(|s| s.as_str()).collect();
+        let names: Vec<&str> = self.queue_names.iter().map(std::string::String::as_str).collect();
         self.status_tracker.get_dashboard_stats(&names).await
     }
 
@@ -234,8 +235,7 @@ impl JobQueueInterface for JobQueueService {
         // Verify worker is registered
         if !self.worker_registry.is_worker_alive(worker_id) {
             return Err(crate::error::JobError::Worker(format!(
-                "Worker '{}' is not registered or has expired",
-                worker_id
+                "Worker '{worker_id}' is not registered or has expired"
             )));
         }
 

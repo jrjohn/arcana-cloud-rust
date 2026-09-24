@@ -17,6 +17,13 @@ pub struct Email(String);
 
 impl Email {
     /// Creates a new Email after validating the format.
+    ///
+    /// The input is trimmed and lowercased before validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EmailError`] (carrying the normalized input) if it is not a
+    /// syntactically valid email address.
     pub fn new(email: impl Into<String>) -> Result<Self, EmailError> {
         let email = email.into().trim().to_lowercase();
 

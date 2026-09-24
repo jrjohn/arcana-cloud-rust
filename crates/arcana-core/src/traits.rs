@@ -56,6 +56,10 @@ pub trait DomainEvent: Send + Sync {
     fn timestamp(&self) -> chrono::DateTime<chrono::Utc>;
 
     /// Serializes the event to JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be serialized to JSON.
     fn to_json(&self) -> ArcanaResult<String>;
 }
 

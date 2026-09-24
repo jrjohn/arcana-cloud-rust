@@ -50,7 +50,7 @@ impl AppState {
 
     /// Creates application state by resolving services from a Shaku module.
     ///
-    /// This is the preferred way to create AppState, as it ensures
+    /// This is the preferred way to create `AppState`, as it ensures
     /// services are properly wired through dependency injection.
     pub fn from_module<M>(module: &M) -> Self
     where

@@ -1,6 +1,6 @@
 //! Redis job queue implementation.
 
-use super::RedisKeys;
+use super::{redis_index, redis_range_end, RedisKeys};
 use crate::config::JobsConfig;
 use crate::error::{JobError, JobResult};
 use crate::job::{Job, JobData, JobId, JobInfo};
@@ -22,6 +22,7 @@ pub struct RedisJobQueue {
 
 impl RedisJobQueue {
     /// Create a new Redis job queue.
+    #[must_use]
     pub fn new(pool: Pool, config: JobsConfig) -> Self {
         let keys = RedisKeys::new(&config.redis.key_prefix);
         Self { pool, keys, config }
@@ -34,14 +35,25 @@ impl RedisJobQueue {
 
     /// Calculate priority score for sorted set.
     /// Higher priority = lower score (processed first).
-    /// Score = -priority * 1e12 + timestamp_ms
+    /// Score = -priority * 1e12 + `timestamp_ms`
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms (~285,000 years)"
+    )]
     fn priority_score(priority: i8, scheduled_at: i64) -> f64 {
-        let priority_component = -(priority as f64) * 1_000_000_000_000.0;
+        let priority_component = -f64::from(priority) * 1_000_000_000_000.0;
         let time_component = scheduled_at as f64;
         priority_component + time_component
     }
 
     /// Move delayed jobs to their queues.
+    ///
+    /// Entries that fail to deserialize are skipped, not reported.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Pool`] if no Redis connection is available, or
+    /// [`JobError::Redis`] if reading the delayed set or moving a job fails.
     pub async fn process_delayed(&self) -> JobResult<u64> {
         let mut conn = self.conn().await?;
         let now = Utc::now().timestamp_millis();
@@ -78,6 +90,13 @@ impl RedisJobQueue {
     }
 
     /// Check for stale active jobs and requeue them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Pool`] if no Redis connection is available,
+    /// [`JobError::Redis`] if a Redis command fails, or
+    /// [`JobError::Serialization`] if a recovered job cannot be re-serialized
+    /// while being requeued.
     pub async fn recover_stale_jobs(&self, stale_threshold: Duration) -> JobResult<u64> {
         let mut conn = self.conn().await?;
         let _threshold = Utc::now() - ChronoDuration::from_std(stale_threshold).unwrap_or_default();
@@ -140,8 +159,7 @@ impl JobQueue for RedisJobQueue {
 
             if exists {
                 return Err(JobError::QueueFull(format!(
-                    "Duplicate job with unique key: {}",
-                    unique_key
+                    "Duplicate job with unique key: {unique_key}"
                 )));
             }
 
@@ -159,6 +177,10 @@ impl JobQueue for RedisJobQueue {
 
         if job_data.scheduled_at.timestamp_millis() > now {
             // Delayed job - add to delayed queue
+            #[allow(
+                clippy::cast_precision_loss,
+                reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms"
+            )]
             let score = job_data.scheduled_at.timestamp_millis() as f64;
             let _: () = conn
                 .zadd(self.keys.delayed(), &job_json, score)
@@ -226,7 +248,6 @@ impl JobQueue for RedisJobQueue {
                     }
                     Err(e) => {
                         error!(error = %e, "Failed to deserialize job data");
-                        continue;
                     }
                 }
             }
@@ -248,9 +269,13 @@ impl JobQueue for RedisJobQueue {
         if let Some(json) = job_json {
             if let Ok(job_data) = JobData::from_json(&json) {
                 // Add to completed set
-                let now = Utc::now().timestamp_millis();
+                #[allow(
+                    clippy::cast_precision_loss,
+                    reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms"
+                )]
+                let now = Utc::now().timestamp_millis() as f64;
                 let _: () = conn
-                    .zadd(self.keys.completed(), &json, now as f64)
+                    .zadd(self.keys.completed(), &json, now)
                     .await?;
 
                 // Update stats
@@ -336,6 +361,10 @@ impl JobQueue for RedisJobQueue {
         let _: () = conn.set(&job_key, &job_json).await?;
 
         // Add to delayed queue
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms"
+        )]
         let score = scheduled_at.timestamp_millis() as f64;
         let _: () = conn.zadd(self.keys.delayed(), &job_json, score).await?;
 
@@ -364,10 +393,14 @@ impl JobQueue for RedisJobQueue {
         dlq_data.set_error(error);
 
         let job_json = dlq_data.to_json()?;
-        let now = Utc::now().timestamp_millis();
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms"
+        )]
+        let now = Utc::now().timestamp_millis() as f64;
 
         // Add to DLQ
-        let _: () = conn.zadd(self.keys.dlq(), &job_json, now as f64).await?;
+        let _: () = conn.zadd(self.keys.dlq(), &job_json, now).await?;
 
         // Update job data
         let job_key = self.keys.job(job_data.id.as_str());
@@ -421,11 +454,14 @@ impl JobQueue for RedisJobQueue {
     }
 
     async fn list_jobs(&self, queue: &str, limit: usize, offset: usize) -> JobResult<Vec<JobInfo>> {
+        let Some(end) = redis_range_end(offset, limit) else {
+            return Ok(Vec::new());
+        };
         let mut conn = self.conn().await?;
         let queue_key = self.keys.priority_queue(queue);
 
         let jobs: Vec<String> = conn
-            .zrange(&queue_key, offset as isize, (offset + limit - 1) as isize)
+            .zrange(&queue_key, redis_index(offset), end)
             .await?;
 
         let mut infos = Vec::with_capacity(jobs.len());
@@ -439,10 +475,13 @@ impl JobQueue for RedisJobQueue {
     }
 
     async fn list_dlq(&self, limit: usize, offset: usize) -> JobResult<Vec<JobInfo>> {
+        let Some(end) = redis_range_end(offset, limit) else {
+            return Ok(Vec::new());
+        };
         let mut conn = self.conn().await?;
 
         let jobs: Vec<String> = conn
-            .zrevrange(self.keys.dlq(), offset as isize, (offset + limit - 1) as isize)
+            .zrevrange(self.keys.dlq(), redis_index(offset), end)
             .await?;
 
         let mut infos = Vec::with_capacity(jobs.len());

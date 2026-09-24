@@ -30,6 +30,13 @@ impl ConfigLoader {
     /// 2. `config/{environment}.toml` - Environment-specific overrides
     /// 3. `config/{deployment_mode}.toml` - Deployment mode overrides
     /// 4. Environment variables with `ARCANA_` prefix
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if the layered sources cannot be
+    /// merged (e.g. a present TOML file is malformed or an `ARCANA_` variable
+    /// cannot be parsed), if the merged tree does not deserialize into
+    /// [`AppConfig`], or if [`ConfigValidator::validate`] rejects the result.
     pub fn new(config_dir: impl Into<String>) -> Result<Self, ArcanaError> {
         let config_dir = config_dir.into();
         let (config, raw) = Self::load_config(&config_dir)?;
@@ -42,6 +49,13 @@ impl ConfigLoader {
     }
 
     /// Loads configuration from the default location (`./config`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if the layered sources cannot be
+    /// merged (e.g. a present TOML file is malformed or an `ARCANA_` variable
+    /// cannot be parsed), if the merged tree does not deserialize into
+    /// [`AppConfig`], or if [`ConfigValidator::validate`] rejects the result.
     pub fn from_default_location() -> Result<Self, ArcanaError> {
         Self::new("./config")
     }
@@ -56,6 +70,11 @@ impl ConfigLoader {
     /// Returns `Ok(None)` when the section is absent, so a caller can fall back
     /// to its own defaults. Any other deserialization failure is an error --
     /// a malformed section must never be silently replaced by defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if the section `key` exists but
+    /// cannot be deserialized into `T`.
     pub async fn section<T: serde::de::DeserializeOwned>(
         &self,
         key: &str,
@@ -64,11 +83,17 @@ impl ConfigLoader {
         match raw.get::<T>(key) {
             Ok(value) => Ok(Some(value)),
             Err(ConfigError::NotFound(_)) => Ok(None),
-            Err(e) => Err(config_error_to_arcana_error(e)),
+            Err(e) => Err(config_error_to_arcana_error(&e)),
         }
     }
 
     /// Reloads the configuration from disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] under the same conditions as
+    /// [`ConfigLoader::new`]; on error the previously loaded configuration is
+    /// left unchanged.
     pub async fn reload(&self) -> Result<(), ArcanaError> {
         let (new_config, new_raw) = Self::load_config(&self.config_dir)?;
         {
@@ -101,28 +126,28 @@ impl ConfigLoader {
         let mut builder = Config::builder();
 
         // 1. Load default configuration
-        let default_path = format!("{}/default.toml", config_dir);
+        let default_path = format!("{config_dir}/default.toml");
         if Path::new(&default_path).exists() {
             debug!("Loading default config from: {}", default_path);
             builder = builder.add_source(File::with_name(&default_path).required(false));
         }
 
         // 2. Load environment-specific configuration
-        let env_path = format!("{}/{}.toml", config_dir, environment);
+        let env_path = format!("{config_dir}/{environment}.toml");
         if Path::new(&env_path).exists() {
             debug!("Loading environment config from: {}", env_path);
             builder = builder.add_source(File::with_name(&env_path).required(false));
         }
 
         // 3. Load deployment mode configuration
-        let mode_path = format!("{}/{}.toml", config_dir, deployment_mode);
+        let mode_path = format!("{config_dir}/{deployment_mode}.toml");
         if Path::new(&mode_path).exists() {
             debug!("Loading deployment mode config from: {}", mode_path);
             builder = builder.add_source(File::with_name(&mode_path).required(false));
         }
 
         // 4. Load local overrides (not committed to version control)
-        let local_path = format!("{}/local.toml", config_dir);
+        let local_path = format!("{config_dir}/local.toml");
         if Path::new(&local_path).exists() {
             debug!("Loading local config from: {}", local_path);
             builder = builder.add_source(File::with_name(&local_path).required(false));
@@ -148,12 +173,12 @@ impl ConfigLoader {
 
         let config = builder
             .build()
-            .map_err(config_error_to_arcana_error)?;
+            .map_err(|e| config_error_to_arcana_error(&e))?;
 
         let app_config: AppConfig = config
             .clone()
             .try_deserialize()
-            .map_err(config_error_to_arcana_error)?;
+            .map_err(|e| config_error_to_arcana_error(&e))?;
 
         // Validate critical configuration
         Self::validate_config(&app_config)?;
@@ -198,7 +223,7 @@ impl ConfigLoader {
     }
 }
 
-fn config_error_to_arcana_error(err: ConfigError) -> ArcanaError {
+fn config_error_to_arcana_error(err: &ConfigError) -> ArcanaError {
     ArcanaError::Configuration(err.to_string())
 }
 

@@ -271,6 +271,10 @@ impl JobMetrics {
     }
 
     /// Update queue size gauges.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "gauges are f64; queue sizes never approach 2^52"
+    )]
     pub fn update_queue_sizes(queue: &str, pending: u64, active: u64, delayed: u64, dlq: u64) {
         gauge!(
             names::JOBS_PENDING,
@@ -304,6 +308,10 @@ pub struct WorkerMetrics;
 
 impl WorkerMetrics {
     /// Update worker count.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "gauges are f64; worker counts never approach 2^52"
+    )]
     pub fn update_workers(pool_id: &str, active: u64, concurrency: usize) {
         gauge!(
             names::WORKERS_ACTIVE,
@@ -350,6 +358,10 @@ pub struct RedisMetrics;
 
 impl RedisMetrics {
     /// Update pool status.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "gauges are f64; pool sizes never approach 2^52"
+    )]
     pub fn update_pool_status(pool_size: usize, available: usize) {
         gauge!(names::REDIS_POOL_SIZE).set(pool_size as f64);
         gauge!(names::REDIS_POOL_AVAILABLE).set(available as f64);

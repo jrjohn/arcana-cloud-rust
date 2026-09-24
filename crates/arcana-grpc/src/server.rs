@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tonic::transport::{Server, ServerTlsConfig};
 use tracing::info;
 
-/// gRPC server builder for service layer (exposes UserService and AuthService).
+/// gRPC server builder for service layer (exposes `UserService` and `AuthService`).
 pub struct GrpcServer {
     addr: SocketAddr,
     user_service: Arc<dyn UserService>,
@@ -25,13 +25,17 @@ pub struct GrpcServer {
 
 impl GrpcServer {
     /// Creates a new gRPC server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if `config.grpc_addr()` is not a valid socket address.
     pub fn new(
         config: &ServerConfig,
         user_service: Arc<dyn UserService>,
         auth_service: Arc<dyn AuthService>,
     ) -> ArcanaResult<Self> {
         let addr = config.grpc_addr().parse().map_err(|e| {
-            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {e}"))
         })?;
 
         Ok(Self {
@@ -43,6 +47,12 @@ impl GrpcServer {
     }
 
     /// Creates a new gRPC server with TLS configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if `config.grpc_addr()` is not a valid socket address,
+    /// if TLS is enabled but the certificate or key path is missing, or if the certificate,
+    /// key or CA file cannot be read.
     pub fn with_tls(
         config: &ServerConfig,
         security_config: &SecurityConfig,
@@ -50,7 +60,7 @@ impl GrpcServer {
         auth_service: Arc<dyn AuthService>,
     ) -> ArcanaResult<Self> {
         let addr = config.grpc_addr().parse().map_err(|e| {
-            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {e}"))
         })?;
 
         let tls_config = TlsConfigBuilder::from_security_config(security_config)?
@@ -66,6 +76,11 @@ impl GrpcServer {
     }
 
     /// Starts the gRPC server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if the TLS configuration cannot be applied, and
+    /// `ArcanaError::Internal` if the server fails to bind or terminates with a transport error.
     pub async fn serve(self) -> ArcanaResult<()> {
         let tls_status = if self.tls_config.is_some() { "with TLS" } else { "without TLS" };
         info!("Starting gRPC server on {} {}", self.addr, tls_status);
@@ -82,7 +97,7 @@ impl GrpcServer {
         // Apply TLS if configured
         if let Some(tls_config) = self.tls_config {
             builder = builder.tls_config(tls_config).map_err(|e| {
-                arcana_core::ArcanaError::Configuration(format!("Failed to configure TLS: {}", e))
+                arcana_core::ArcanaError::Configuration(format!("Failed to configure TLS: {e}"))
             })?;
         }
 
@@ -94,13 +109,13 @@ impl GrpcServer {
             .add_service(jobs::v1::worker_service_server::WorkerServiceServer::new(worker_service))
             .serve(self.addr)
             .await
-            .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {}", e)))?;
+            .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {e}")))?;
 
         Ok(())
     }
 }
 
-/// gRPC server for repository layer (exposes UserRepository).
+/// gRPC server for repository layer (exposes `UserRepository`).
 pub struct RepositoryGrpcServer {
     addr: SocketAddr,
     user_repository: Arc<dyn UserRepository>,
@@ -109,12 +124,16 @@ pub struct RepositoryGrpcServer {
 
 impl RepositoryGrpcServer {
     /// Creates a new repository gRPC server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if `config.grpc_addr()` is not a valid socket address.
     pub fn new(
         config: &ServerConfig,
         user_repository: Arc<dyn UserRepository>,
     ) -> ArcanaResult<Self> {
         let addr = config.grpc_addr().parse().map_err(|e| {
-            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {e}"))
         })?;
 
         Ok(Self {
@@ -125,13 +144,19 @@ impl RepositoryGrpcServer {
     }
 
     /// Creates a new repository gRPC server with TLS configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if `config.grpc_addr()` is not a valid socket address,
+    /// if TLS is enabled but the certificate or key path is missing, or if the certificate,
+    /// key or CA file cannot be read.
     pub fn with_tls(
         config: &ServerConfig,
         security_config: &SecurityConfig,
         user_repository: Arc<dyn UserRepository>,
     ) -> ArcanaResult<Self> {
         let addr = config.grpc_addr().parse().map_err(|e| {
-            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {e}"))
         })?;
 
         let tls_config = TlsConfigBuilder::from_security_config(security_config)?
@@ -146,6 +171,11 @@ impl RepositoryGrpcServer {
     }
 
     /// Starts the repository gRPC server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if the TLS configuration cannot be applied, and
+    /// `ArcanaError::Internal` if the server fails to bind or terminates with a transport error.
     pub async fn serve(self) -> ArcanaResult<()> {
         let tls_status = if self.tls_config.is_some() { "with TLS" } else { "without TLS" };
         info!("Starting Repository gRPC server on {} {}", self.addr, tls_status);
@@ -158,7 +188,7 @@ impl RepositoryGrpcServer {
         // Apply TLS if configured
         if let Some(tls_config) = self.tls_config {
             builder = builder.tls_config(tls_config).map_err(|e| {
-                arcana_core::ArcanaError::Configuration(format!("Failed to configure TLS: {}", e))
+                arcana_core::ArcanaError::Configuration(format!("Failed to configure TLS: {e}"))
             })?;
         }
 
@@ -171,7 +201,7 @@ impl RepositoryGrpcServer {
             )
             .serve(self.addr)
             .await
-            .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {}", e)))?;
+            .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {e}")))?;
 
         Ok(())
     }
@@ -184,15 +214,23 @@ pub struct SimpleGrpcServer {
 
 impl SimpleGrpcServer {
     /// Creates a new simple gRPC server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Configuration` if `config.grpc_addr()` is not a valid socket address.
     pub fn new(config: &ServerConfig) -> ArcanaResult<Self> {
         let addr = config.grpc_addr().parse().map_err(|e| {
-            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {}", e))
+            arcana_core::ArcanaError::Configuration(format!("Invalid gRPC address: {e}"))
         })?;
 
         Ok(Self { addr })
     }
 
     /// Starts the gRPC server with only health service.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ArcanaError::Internal` if the server fails to bind or terminates with a transport error.
     pub async fn serve(self) -> ArcanaResult<()> {
         info!("Starting gRPC server on {}", self.addr);
 
@@ -202,7 +240,7 @@ impl SimpleGrpcServer {
             .add_service(health::health_server::HealthServer::new(health_service))
             .serve(self.addr)
             .await
-            .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {}", e)))?;
+            .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {e}")))?;
 
         Ok(())
     }

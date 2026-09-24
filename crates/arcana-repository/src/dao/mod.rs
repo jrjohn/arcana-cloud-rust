@@ -1,7 +1,7 @@
 //! DAO (Data Access Object) layer.
 //!
 //! DAOs provide low-level, single-source data access abstractions.
-//! Each DAO interface maps to one data source (MySQL, gRPC, REST, etc.).
+//! Each DAO interface maps to one data source (`MySQL`, gRPC, REST, etc.).
 //!
 //! ## Structure
 //!

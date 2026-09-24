@@ -222,7 +222,7 @@ fn parse_job_status(status: &str) -> Option<JobStatusEnum> {
     }
 }
 
-/// Convert JobInfo to JobResponse.
+/// Convert `JobInfo` to `JobResponse`.
 fn job_info_to_response(info: &arcana_jobs::JobInfo) -> JobResponse {
     JobResponse {
         id: info.id.to_string(),
@@ -254,8 +254,8 @@ async fn list_queues(State(state): State<AppState>) -> impl IntoResponse {
     let job_queue = state.job_queue.as_ref().unwrap();
 
     match job_queue.get_all_queue_stats().await {
-        Ok(stats) => {
-            let queues = stats
+        Ok(all_stats) => {
+            let queues = all_stats
                 .into_iter()
                 .map(|s| QueueInfo {
                     name: s.queue,
@@ -291,13 +291,13 @@ async fn queue_stats(
     let job_queue = state.job_queue.as_ref().unwrap();
 
     match job_queue.get_queue_stats(&queue).await {
-        Ok(stats) => Json(QueueInfo {
-            name: stats.queue,
-            pending: stats.pending,
-            active: stats.active,
-            completed: stats.completed,
-            failed: stats.failed,
-            delayed: stats.delayed,
+        Ok(queue_stats) => Json(QueueInfo {
+            name: queue_stats.queue,
+            pending: queue_stats.pending,
+            active: queue_stats.active,
+            completed: queue_stats.completed,
+            failed: queue_stats.failed,
+            delayed: queue_stats.delayed,
         })
         .into_response(),
         Err(e) => (
@@ -449,7 +449,7 @@ async fn get_job(
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
-                error: format!("Job {} not found", job_id),
+                error: format!("Job {job_id} not found"),
                 code: "NOT_FOUND".to_string(),
             }),
         )
@@ -479,7 +479,7 @@ async fn cancel_job(
 
     match job_queue.cancel_job(&job_id).await {
         Ok(()) => Json(MessageResponse {
-            message: format!("Job {} cancelled", job_id),
+            message: format!("Job {job_id} cancelled"),
         })
         .into_response(),
         Err(e) => (
@@ -507,7 +507,7 @@ async fn retry_job(
 
     match job_queue.retry_job(&job_id).await {
         Ok(()) => Json(MessageResponse {
-            message: format!("Job {} queued for retry", job_id),
+            message: format!("Job {job_id} queued for retry"),
         })
         .into_response(),
         Err(e) => (
@@ -570,7 +570,7 @@ async fn retry_dlq_job(
 
     match job_queue.retry_dlq_job(&job_id).await {
         Ok(()) => Json(MessageResponse {
-            message: format!("DLQ job {} queued for retry", job_id),
+            message: format!("DLQ job {job_id} queued for retry"),
         })
         .into_response(),
         Err(e) => (
@@ -603,15 +603,15 @@ async fn dashboard_stats(State(state): State<AppState>) -> impl IntoResponse {
     let job_queue = state.job_queue.as_ref().unwrap();
 
     match job_queue.get_dashboard_stats().await {
-        Ok(stats) => Json(DashboardResponse {
-            total_jobs: stats.total_jobs,
-            pending: stats.total_pending,
-            active: stats.total_active,
-            completed: stats.total_completed,
-            failed: stats.total_failed,
-            dead_letter: stats.total_dead_letter,
-            delayed: stats.total_delayed,
-            queues: stats
+        Ok(dashboard) => Json(DashboardResponse {
+            total_jobs: dashboard.total_jobs,
+            pending: dashboard.total_pending,
+            active: dashboard.total_active,
+            completed: dashboard.total_completed,
+            failed: dashboard.total_failed,
+            dead_letter: dashboard.total_dead_letter,
+            delayed: dashboard.total_delayed,
+            queues: dashboard
                 .queues
                 .into_iter()
                 .map(|s| QueueInfo {
@@ -770,7 +770,7 @@ async fn trigger_scheduled_job(
 ) -> impl IntoResponse {
     // Would require scheduler integration
     Json(MessageResponse {
-        message: format!("Scheduled job '{}' triggered", name),
+        message: format!("Scheduled job '{name}' triggered"),
     })
 }
 
@@ -780,7 +780,7 @@ async fn enable_scheduled_job(
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     Json(MessageResponse {
-        message: format!("Scheduled job '{}' enabled", name),
+        message: format!("Scheduled job '{name}' enabled"),
     })
 }
 
@@ -790,6 +790,6 @@ async fn disable_scheduled_job(
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     Json(MessageResponse {
-        message: format!("Scheduled job '{}' disabled", name),
+        message: format!("Scheduled job '{name}' disabled"),
     })
 }

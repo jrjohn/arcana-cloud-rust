@@ -7,21 +7,43 @@ use crate::Claims;
 /// Extension trait for Claims to check permissions.
 pub trait ClaimsExt {
     /// Requires a specific role.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Forbidden`] if the claims' role is below `role`.
     fn require_role(&self, role: UserRole) -> ArcanaResult<()>;
 
     /// Requires a specific permission.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Forbidden`] if the claims' role is not allowed
+    /// `permission`.
     fn require_permission(&self, permission: Permission) -> ArcanaResult<()>;
 
     /// Requires either the specified role or being the resource owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Forbidden`] if the claims' role is below `role`
+    /// and the caller is not `resource_owner_id`.
     fn require_role_or_owner(&self, role: UserRole, resource_owner_id: UserId) -> ArcanaResult<()>;
 
     /// Checks if the user is the owner of a resource.
     fn is_owner(&self, resource_owner_id: UserId) -> bool;
 
     /// Requires the user to be an admin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Forbidden`] if the role is below `Admin`.
     fn require_admin(&self) -> ArcanaResult<()>;
 
     /// Requires the user to be a super admin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Forbidden`] if the role is below `SuperAdmin`.
     fn require_super_admin(&self) -> ArcanaResult<()>;
 }
 
@@ -61,8 +83,7 @@ impl ClaimsExt for Claims {
 
     fn is_owner(&self, resource_owner_id: UserId) -> bool {
         self.user_id()
-            .map(|id| id == resource_owner_id)
-            .unwrap_or(false)
+            .is_some_and(|id| id == resource_owner_id)
     }
 
     fn require_admin(&self) -> ArcanaResult<()> {
@@ -115,6 +136,12 @@ impl PermissionGuard {
     }
 
     /// Checks if the claims satisfy the guard requirements.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Forbidden`] if the claims do not meet the required
+    /// role or permission. Never errors when owner access is allowed and the
+    /// caller owns `resource_owner_id`.
     pub fn check(&self, claims: &Claims, resource_owner_id: Option<UserId>) -> ArcanaResult<()> {
         // Check if owner access is allowed and user is owner
         if self.allow_owner {
@@ -147,7 +174,7 @@ impl Default for PermissionGuard {
 
 /// Predefined permission guards for common scenarios.
 pub mod guards {
-    use super::*;
+    use super::{PermissionGuard, UserRole, Permission};
 
     /// Guard that allows any authenticated user.
     #[must_use]

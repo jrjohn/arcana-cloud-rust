@@ -10,6 +10,13 @@ use deadpool_redis::{Config, Pool, Runtime};
 use tracing::info;
 
 /// Create a Redis connection pool.
+///
+/// # Errors
+///
+/// - [`JobError::Configuration`] if `config.url` is not a valid Redis URL or
+///   the pool cannot be built.
+/// - [`JobError::Pool`] if no connection can be obtained from the new pool.
+/// - [`JobError::Redis`] if the initial `PING` fails.
 pub async fn create_pool(config: &RedisConfig) -> JobResult<Pool> {
     info!("Creating Redis connection pool for job queue...");
 
@@ -17,11 +24,11 @@ pub async fn create_pool(config: &RedisConfig) -> JobResult<Pool> {
 
     let pool = cfg
         .builder()
-        .map_err(|e| JobError::Configuration(format!("Invalid Redis config: {}", e)))?
+        .map_err(|e| JobError::Configuration(format!("Invalid Redis config: {e}")))?
         .max_size(config.pool_size)
         .runtime(Runtime::Tokio1)
         .build()
-        .map_err(|e| JobError::Configuration(format!("Failed to create pool: {}", e)))?;
+        .map_err(|e| JobError::Configuration(format!("Failed to create pool: {e}")))?;
 
     // Test connection
     let mut conn = pool.get().await?;
@@ -32,6 +39,26 @@ pub async fn create_pool(config: &RedisConfig) -> JobResult<Pool> {
     info!("Redis connection pool created successfully");
 
     Ok(pool)
+}
+
+/// Converts a pagination index to the signed index type Redis range commands
+/// take, saturating at `isize::MAX` instead of wrapping to a negative
+/// (from-the-end) index.
+pub(crate) fn redis_index(index: usize) -> isize {
+    isize::try_from(index).unwrap_or(isize::MAX)
+}
+
+/// Inclusive end index for a Redis range of `limit` items starting at `offset`,
+/// or `None` when `limit` is 0.
+///
+/// `offset + limit - 1` underflows for `limit == 0`: a debug build panics and a
+/// release build wraps to `usize::MAX`, which `ZRANGE offset <huge>` turns into
+/// "everything from `offset` on" instead of no items. Callers return an empty
+/// result on `None` without querying Redis.
+pub(crate) fn redis_range_end(offset: usize, limit: usize) -> Option<isize> {
+    limit
+        .checked_sub(1)
+        .map(|last| redis_index(offset.saturating_add(last)))
 }
 
 /// Redis key builder for job queue.
@@ -48,61 +75,73 @@ impl RedisKeys {
     }
 
     /// Queue key for pending jobs (sorted set by scheduled time).
+    #[must_use]
     pub fn queue(&self, queue_name: &str) -> String {
         format!("{}:queue:{}", self.prefix, queue_name)
     }
 
     /// Priority queue key (sorted set by priority + time).
+    #[must_use]
     pub fn priority_queue(&self, queue_name: &str) -> String {
         format!("{}:pqueue:{}", self.prefix, queue_name)
     }
 
     /// Delayed jobs key (sorted set by execution time).
+    #[must_use]
     pub fn delayed(&self) -> String {
         format!("{}:delayed", self.prefix)
     }
 
-    /// Active jobs key (hash: job_id -> worker_id).
+    /// Active jobs key (hash: `job_id` -> `worker_id`).
+    #[must_use]
     pub fn active(&self) -> String {
         format!("{}:active", self.prefix)
     }
 
-    /// Job data key (hash: job_id -> job data).
+    /// Job data key (hash: `job_id` -> job data).
+    #[must_use]
     pub fn job(&self, job_id: &str) -> String {
         format!("{}:job:{}", self.prefix, job_id)
     }
 
     /// Dead letter queue key (sorted set).
+    #[must_use]
     pub fn dlq(&self) -> String {
         format!("{}:dlq", self.prefix)
     }
 
     /// Completed jobs key (sorted set by completion time).
+    #[must_use]
     pub fn completed(&self) -> String {
         format!("{}:completed", self.prefix)
     }
 
     /// Unique job key for deduplication.
+    #[must_use]
     pub fn unique(&self, key: &str) -> String {
         format!("{}:unique:{}", self.prefix, key)
     }
 
     /// Worker heartbeat key.
+    #[must_use]
     pub fn worker(&self, worker_id: &str) -> String {
         format!("{}:worker:{}", self.prefix, worker_id)
     }
 
     /// Scheduler lock key.
+    #[must_use]
     pub fn scheduler_lock(&self) -> String {
         format!("{}:scheduler:lock", self.prefix)
     }
 
-    /// Scheduled jobs key (hash: job_name -> cron expression).
+    /// Scheduled jobs key (hash: `job_name` -> cron expression).
+    #[must_use]
     pub fn scheduled(&self) -> String {
         format!("{}:scheduled", self.prefix)
     }
 
     /// Stats key.
+    #[must_use]
     pub fn stats(&self, queue_name: &str) -> String {
         format!("{}:stats:{}", self.prefix, queue_name)
     }
@@ -116,6 +155,20 @@ impl Default for RedisKeys {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn redis_range_end_is_none_for_zero_limit() {
+        assert_eq!(redis_range_end(0, 0), None);
+        assert_eq!(redis_range_end(10, 0), None);
+    }
+
+    #[test]
+    fn redis_range_end_is_inclusive_and_saturates() {
+        assert_eq!(redis_range_end(0, 1), Some(0));
+        assert_eq!(redis_range_end(10, 5), Some(14));
+        assert_eq!(redis_range_end(usize::MAX, 5), Some(isize::MAX));
+    }
+
     use super::*;
 
     #[test]

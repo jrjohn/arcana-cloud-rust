@@ -43,7 +43,7 @@ impl Default for WorkerPoolConfig {
         Self {
             concurrency: 4,
             queues: vec!["default".to_string()],
-            job_timeout: Duration::from_secs(300),
+            job_timeout: Duration::from_mins(5),
             poll_interval: Duration::from_millis(100),
             shutdown_timeout: Duration::from_secs(30),
             heartbeat_interval: Duration::from_secs(30),
@@ -156,6 +156,17 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
     }
 
     /// Start the worker pool.
+    ///
+    /// Runs until the pool is signalled to stop. Per-job failures (dequeue,
+    /// handler, timeout) are logged and recorded on the queue, not returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Worker`] if the pool is already running.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "the spawned per-job task captures the loop's clones inline; splitting it out is a larger refactor than this lint cleanup"
+    )]
     pub async fn start(&self) -> JobResult<()> {
         if self.running.swap(true, Ordering::SeqCst) {
             return Err(JobError::Worker("Worker pool already running".to_string()));
@@ -172,7 +183,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         // Spawn worker tasks
-        let _queues: Vec<&str> = self.config.queues.iter().map(|s| s.as_str()).collect();
+        let _queues: Vec<&str> = self.config.queues.iter().map(std::string::String::as_str).collect();
 
         loop {
             tokio::select! {
@@ -194,7 +205,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
                         let jobs_failed = self.jobs_failed.clone();
 
                         tokio::spawn(async move {
-                            let queues_ref: Vec<&str> = queues_owned.iter().map(|s| s.as_str()).collect();
+                            let queues_ref: Vec<&str> = queues_owned.iter().map(std::string::String::as_str).collect();
 
                             // Try to dequeue a job
                             match queue.dequeue(&queues_ref, &worker_id).await {
@@ -220,7 +231,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
                                     if handler.is_none() {
                                         error!(job_name = %job_name, "No handler registered for job type");
                                         let _ = queue.fail(&job_id, &JobError::Configuration(
-                                            format!("No handler for job type: {}", job_name)
+                                            format!("No handler for job type: {job_name}")
                                         )).await;
                                         jobs_failed.fetch_add(1, Ordering::Relaxed);
                                         drop(permit);
@@ -243,17 +254,14 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
                                     };
 
                                     // If no handler was found (shouldn't happen as we checked above)
-                                    let result = match result {
-                                        Some(r) => r,
-                                        None => {
-                                            error!(job_name = %job_name, "Handler not found during execution");
-                                            let _ = queue.fail(&job_id, &JobError::Configuration(
-                                                format!("Handler disappeared for job type: {}", job_name)
-                                            )).await;
-                                            jobs_failed.fetch_add(1, Ordering::Relaxed);
-                                            drop(permit);
-                                            return;
-                                        }
+                                    let Some(result) = result else {
+                                        error!(job_name = %job_name, "Handler not found during execution");
+                                        let _ = queue.fail(&job_id, &JobError::Configuration(
+                                            format!("Handler disappeared for job type: {job_name}")
+                                        )).await;
+                                        jobs_failed.fetch_add(1, Ordering::Relaxed);
+                                        drop(permit);
+                                        return;
                                     };
 
                                     match result {
@@ -329,21 +337,25 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
     }
 
     /// Check if the pool is running.
+    #[must_use]
     pub fn is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
     }
 
     /// Get the number of jobs processed.
+    #[must_use]
     pub fn jobs_processed(&self) -> u64 {
         self.jobs_processed.load(Ordering::Relaxed)
     }
 
     /// Get the number of jobs failed.
+    #[must_use]
     pub fn jobs_failed(&self) -> u64 {
         self.jobs_failed.load(Ordering::Relaxed)
     }
 
     /// Get the pool ID.
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -377,11 +389,13 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
     /// A pool with zero handlers fails every job it dequeues, so callers
     /// (deployment roles) check this at startup rather than discovering it
     /// one dead-lettered job at a time.
+    #[must_use]
     pub fn handler_count(&self) -> usize {
         self.handlers.read().len()
     }
 
     /// Get pool statistics.
+    #[must_use]
     pub fn stats(&self) -> WorkerPoolStats {
         WorkerPoolStats {
             id: self.id.clone(),

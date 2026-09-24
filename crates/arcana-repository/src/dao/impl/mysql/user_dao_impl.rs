@@ -1,12 +1,13 @@
-//! MySQL UserDao implementation.
+//! `MySQL` `UserDao` implementation.
 //!
-//! Low-level data access for the `users` table via SQLx.
+//! Low-level data access for the `users` table via `SQLx`.
 //! Implements [`UserDao`] — the DAO layer directly beneath [`UserRepositoryImpl`].
 //!
 //! [`UserDao`]: crate::dao::UserDao
 //! [`UserRepositoryImpl`]: crate::UserRepositoryImpl
 
 use crate::{dao::UserDao, DatabasePoolInterface};
+use crate::sql_convert::{count_to_u64, to_sql_bigint};
 use arcana_core::{ArcanaError, ArcanaResult, Page, PageRequest, UserId};
 use arcana_core::{Email, User, UserRole, UserStatus};
 use async_trait::async_trait;
@@ -17,9 +18,9 @@ use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
-/// MySQL implementation of [`UserDao`].
+/// `MySQL` implementation of [`UserDao`].
 ///
-/// Connects directly to a MySQL database via an SQLx connection pool.
+/// Connects directly to a `MySQL` database via an `SQLx` connection pool.
 /// In the 4-layer hierarchy this is the DAO Impl:
 ///
 /// ```text
@@ -107,12 +108,12 @@ impl UserDao for MySqlUserDaoImpl {
     async fn find_by_id(&self, id: UserId) -> ArcanaResult<Option<User>> {
         debug!("MySQL DAO: find_by_id {}", id);
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users WHERE id = ? AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(id.into_inner().to_string())
         .fetch_optional(self.pool.inner())
@@ -123,12 +124,12 @@ impl UserDao for MySqlUserDaoImpl {
     async fn find_by_username(&self, username: &str) -> ArcanaResult<Option<User>> {
         debug!("MySQL DAO: find_by_username {}", username);
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users WHERE username = ? AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(username)
         .fetch_optional(self.pool.inner())
@@ -139,12 +140,12 @@ impl UserDao for MySqlUserDaoImpl {
     async fn find_by_email(&self, email: &str) -> ArcanaResult<Option<User>> {
         debug!("MySQL DAO: find_by_email {}", email);
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users WHERE LOWER(email) = LOWER(?) AND status != 'deleted'
-            "#,
+            ",
         )
         .bind(email)
         .fetch_optional(self.pool.inner())
@@ -155,14 +156,14 @@ impl UserDao for MySqlUserDaoImpl {
     async fn find_by_username_or_email(&self, identifier: &str) -> ArcanaResult<Option<User>> {
         debug!("MySQL DAO: find_by_username_or_email {}", identifier);
         let row = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users
             WHERE (username = ? OR LOWER(email) = LOWER(?)) AND status != 'deleted'
             LIMIT 1
-            "#,
+            ",
         )
         .bind(identifier)
         .bind(identifier)
@@ -197,22 +198,22 @@ impl UserDao for MySqlUserDaoImpl {
                 .await?;
 
         let rows = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users WHERE status != 'deleted'
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
-            "#,
+            ",
         )
-        .bind(page.limit() as i64)
-        .bind(page.offset() as i64)
+        .bind(to_sql_bigint(page.limit()))
+        .bind(to_sql_bigint(page.offset()))
         .fetch_all(self.pool.inner())
         .await?;
 
         let users: Vec<User> = rows.into_iter().map(User::try_from).collect::<Result<_, _>>()?;
-        Ok(Page::new(users, page.page, page.size, total as u64))
+        Ok(Page::new(users, page.page, page.size, count_to_u64(total)))
     }
 
     async fn find_by_role(&self, role: UserRole, page: PageRequest) -> ArcanaResult<Page<User>> {
@@ -226,34 +227,34 @@ impl UserDao for MySqlUserDaoImpl {
         .await?;
 
         let rows = sqlx::query_as::<_, UserRow>(
-            r#"
+            r"
             SELECT id, username, email, password_hash, first_name, last_name,
                    role, status, email_verified, avatar_url, last_login_at,
                    created_at, updated_at
             FROM users WHERE role = ? AND status != 'deleted'
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
-            "#,
+            ",
         )
         .bind(&role_str)
-        .bind(page.limit() as i64)
-        .bind(page.offset() as i64)
+        .bind(to_sql_bigint(page.limit()))
+        .bind(to_sql_bigint(page.offset()))
         .fetch_all(self.pool.inner())
         .await?;
 
         let users: Vec<User> = rows.into_iter().map(User::try_from).collect::<Result<_, _>>()?;
-        Ok(Page::new(users, page.page, page.size, total as u64))
+        Ok(Page::new(users, page.page, page.size, count_to_u64(total)))
     }
 
     async fn save(&self, user: &User) -> ArcanaResult<User> {
         debug!("MySQL DAO: save user {}", user.username);
         let id_str = user.id.into_inner().to_string();
         sqlx::query(
-            r#"
+            r"
             INSERT INTO users (id, username, email, password_hash, first_name, last_name,
                               role, status, email_verified, avatar_url, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
+            ",
         )
         .bind(&id_str)
         .bind(&user.username)
@@ -279,13 +280,13 @@ impl UserDao for MySqlUserDaoImpl {
         debug!("MySQL DAO: update user {}", user.id);
         let id_str = user.id.into_inner().to_string();
         sqlx::query(
-            r#"
+            r"
             UPDATE users
             SET username = ?, email = ?, password_hash = ?, first_name = ?,
                 last_name = ?, role = ?, status = ?, email_verified = ?,
                 avatar_url = ?, last_login_at = ?, updated_at = ?
             WHERE id = ?
-            "#,
+            ",
         )
         .bind(&user.username)
         .bind(user.email.as_str())
@@ -323,7 +324,7 @@ impl UserDao for MySqlUserDaoImpl {
             sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE status != 'deleted'")
                 .fetch_one(self.pool.inner())
                 .await?;
-        Ok(count as u64)
+        Ok(count_to_u64(count))
     }
 
     async fn count_by_role(&self, role: UserRole) -> ArcanaResult<u64> {
@@ -333,7 +334,7 @@ impl UserDao for MySqlUserDaoImpl {
         .bind(role.to_string())
         .fetch_one(self.pool.inner())
         .await?;
-        Ok(count as u64)
+        Ok(count_to_u64(count))
     }
 }
 

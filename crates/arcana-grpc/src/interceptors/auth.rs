@@ -42,6 +42,11 @@ pub fn extract_claims<T>(request: &Request<T>) -> Option<&Claims> {
 }
 
 /// Requires authentication for a gRPC request.
+///
+/// # Errors
+///
+/// Returns `Status::unauthenticated` if the request carries no `Claims` extension
+/// (i.e. the auth interceptor did not attach a validated token).
 pub fn require_auth<T>(request: &Request<T>) -> Result<&Claims, Status> {
     extract_claims(request).ok_or_else(|| Status::unauthenticated("Authentication required"))
 }

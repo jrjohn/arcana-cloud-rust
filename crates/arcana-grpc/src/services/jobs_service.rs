@@ -26,6 +26,7 @@ pub struct JobQueueServiceImpl {
 
 impl JobQueueServiceImpl {
     /// Create a new job queue service without a backend.
+    #[must_use]
     pub fn new() -> Self {
         Self { job_queue: None }
     }
@@ -248,6 +249,7 @@ pub struct WorkerServiceImpl {
 
 impl WorkerServiceImpl {
     /// Create a new worker service without a backend.
+    #[must_use]
     pub fn new() -> Self {
         Self { job_queue: None }
     }
@@ -332,7 +334,7 @@ impl WorkerService for WorkerServiceImpl {
         );
 
         let queue = self.require_queue()?;
-        let queues: Vec<&str> = req.queues.iter().map(|s| s.as_str()).collect();
+        let queues: Vec<&str> = req.queues.iter().map(std::string::String::as_str).collect();
 
         let job_data_list = queue
             .dequeue_for_worker(&queues, &req.worker_id, req.max_jobs)
@@ -403,7 +405,7 @@ impl WorkerService for WorkerServiceImpl {
     }
 }
 
-/// Convert JobData to proto Job.
+/// Convert `JobData` to proto Job.
 fn job_data_to_proto(data: &arcana_jobs::JobData) -> ProtoJob {
     ProtoJob {
         id: data.id.to_string(),
@@ -422,6 +424,7 @@ fn job_data_to_proto(data: &arcana_jobs::JobData) -> ProtoJob {
 }
 
 /// Convert Priority enum to proto.
+#[must_use]
 pub fn priority_to_proto(priority: i8) -> i32 {
     match priority {
         p if p >= 20 => ProtoPriority::Critical as i32,
@@ -432,6 +435,7 @@ pub fn priority_to_proto(priority: i8) -> i32 {
 }
 
 /// Convert proto Priority to i8.
+#[must_use]
 pub fn proto_to_priority(proto: i32) -> i8 {
     match ProtoPriority::try_from(proto) {
         Ok(ProtoPriority::Critical) => 20,
@@ -441,7 +445,8 @@ pub fn proto_to_priority(proto: i32) -> i8 {
     }
 }
 
-/// Convert JobStatus enum to proto.
+/// Convert `JobStatus` enum to proto.
+#[must_use]
 pub fn job_status_to_proto(status: &str) -> i32 {
     match status {
         "pending" => ProtoJobStatus::Pending as i32,

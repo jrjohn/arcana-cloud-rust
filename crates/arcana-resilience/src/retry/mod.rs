@@ -32,6 +32,7 @@ impl Default for RetryPolicy {
 
 impl RetryPolicy {
     /// Creates a new retry policy with the specified max attempts.
+    #[must_use]
     pub fn with_max_attempts(max_attempts: u32) -> Self {
         Self {
             max_attempts,
@@ -40,12 +41,23 @@ impl RetryPolicy {
     }
 
     /// Calculates the delay for a given attempt number.
+    #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "delays are in milliseconds, far below f64's 2^53 exact-integer range; \
+                  the f64 -> u64 `as` casts saturate (negative/NaN -> 0) and truncating \
+                  to whole milliseconds is intended"
+    )]
     pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
         if attempt == 0 {
             return Duration::ZERO;
         }
 
-        let base_delay = self.initial_delay.as_millis() as f64 * self.multiplier.powi(attempt as i32 - 1);
+        // Exponents beyond i32::MAX saturate; the delay is capped by `max_delay` anyway.
+        let exponent = i32::try_from(attempt - 1).unwrap_or(i32::MAX);
+        let base_delay = self.initial_delay.as_millis() as f64 * self.multiplier.powi(exponent);
         let delay = Duration::from_millis(base_delay.min(self.max_delay.as_millis() as f64) as u64);
 
         if self.jitter {
@@ -58,15 +70,23 @@ impl RetryPolicy {
     }
 
     /// Executes a function with retry logic.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error from the last attempt if all calls of `f` fail. `f` is
+    /// called `max_attempts` times, and always at least once: `max_attempts == 0`
+    /// is treated as a single attempt with no retries (it used to panic, because
+    /// there was no error to return).
     pub async fn execute<F, Fut, T, E>(&self, mut f: F) -> Result<T, E>
     where
         F: FnMut() -> Fut,
         Fut: std::future::Future<Output = Result<T, E>>,
         E: std::fmt::Display,
     {
-        let mut last_error = None;
+        let attempts = self.max_attempts.max(1);
+        let mut attempt = 0;
 
-        for attempt in 0..self.max_attempts {
+        loop {
             if attempt > 0 {
                 let delay = self.delay_for_attempt(attempt);
                 debug!("Retry attempt {} after {:?}", attempt, delay);
@@ -77,12 +97,13 @@ impl RetryPolicy {
                 Ok(result) => return Ok(result),
                 Err(e) => {
                     debug!("Attempt {} failed: {}", attempt + 1, e);
-                    last_error = Some(e);
+                    attempt += 1;
+                    if attempt >= attempts {
+                        return Err(e);
+                    }
                 }
             }
         }
-
-        Err(last_error.expect("at least one attempt should have been made"))
     }
 }
 
@@ -93,7 +114,7 @@ fn rand_simple() -> f64 {
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .subsec_nanos();
-    (nanos % 1000) as f64 / 1000.0
+    f64::from(nanos % 1000) / 1000.0
 }
 
 #[cfg(test)]
@@ -228,5 +249,28 @@ mod tests {
         let policy = RetryPolicy::with_max_attempts(1);
         let result: Result<i32, &str> = policy.execute(|| async { Err("fail") }).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_zero_max_attempts_runs_once_instead_of_panicking() {
+        let policy = RetryPolicy {
+            max_attempts: 0,
+            ..RetryPolicy::default()
+        };
+        let calls = Arc::new(AtomicU32::new(0));
+        let c = calls.clone();
+
+        let result: Result<(), String> = policy
+            .execute(|| {
+                let c = c.clone();
+                async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                    Err("boom".to_string())
+                }
+            })
+            .await;
+
+        assert_eq!(result, Err("boom".to_string()));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }

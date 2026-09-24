@@ -15,6 +15,7 @@ pub struct JobId(String);
 
 impl JobId {
     /// Creates a new random job ID.
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4().to_string())
     }
@@ -25,6 +26,7 @@ impl JobId {
     }
 
     /// Returns the job ID as a string slice.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -84,11 +86,13 @@ pub struct JobContext {
 
 impl JobContext {
     /// Returns true if this is the last attempt.
+    #[must_use]
     pub fn is_last_attempt(&self) -> bool {
         self.attempt >= self.max_attempts
     }
 
     /// Returns remaining attempts.
+    #[must_use]
     pub fn remaining_attempts(&self) -> u32 {
         self.max_attempts.saturating_sub(self.attempt)
     }
@@ -230,6 +234,11 @@ pub struct JobData {
 
 impl JobData {
     /// Creates new job data from a Job instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Serialization`] if the job payload or its retry
+    /// policy cannot be serialized to JSON.
     pub fn new<J: Job>(job: &J) -> JobResult<Self> {
         let payload = serde_json::to_string(job)?;
 
@@ -253,6 +262,11 @@ impl JobData {
     }
 
     /// Deserialize the job payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Serialization`] if the stored payload is not valid
+    /// JSON for `J`.
     pub fn deserialize<J: Job>(&self) -> JobResult<J> {
         Ok(serde_json::from_str(&self.payload)?)
     }
@@ -263,6 +277,7 @@ impl JobData {
     }
 
     /// Check if max attempts reached.
+    #[must_use]
     pub fn is_exhausted(&self) -> bool {
         self.attempt >= self.max_attempts
     }
@@ -273,6 +288,7 @@ impl JobData {
     }
 
     /// Create job context for execution.
+    #[must_use]
     pub fn to_context(&self, worker_id: &str) -> JobContext {
         JobContext {
             job_id: self.id.clone(),
@@ -287,11 +303,21 @@ impl JobData {
     }
 
     /// Serialize to JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Serialization`] if `serde_json` fails to serialize
+    /// the job data.
     pub fn to_json(&self) -> JobResult<String> {
         Ok(serde_json::to_string(self)?)
     }
 
     /// Deserialize from JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobError::Serialization`] if `json` is not a valid
+    /// serialized [`JobData`].
     pub fn from_json(json: &str) -> JobResult<Self> {
         Ok(serde_json::from_str(json)?)
     }

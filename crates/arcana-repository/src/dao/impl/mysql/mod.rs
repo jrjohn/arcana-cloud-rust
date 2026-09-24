@@ -1,4 +1,4 @@
-//! MySQL DAO implementations.
+//! `MySQL` DAO implementations.
 
 pub mod user_dao_impl;
 

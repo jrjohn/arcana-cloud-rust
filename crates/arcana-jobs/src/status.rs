@@ -3,7 +3,7 @@
 use crate::error::JobResult;
 use crate::job::{JobInfo, JobStatus};
 use crate::queue::QueueStats;
-use crate::redis::RedisKeys;
+use crate::redis::{redis_index, redis_range_end, RedisKeys};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use deadpool_redis::Pool;
 use redis::AsyncCommands;
@@ -28,6 +28,12 @@ impl JobStatusTracker {
     }
 
     /// Get job info by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails, or `JobError::Serialization`
+    /// if the stored job is not a valid serialized [`JobInfo`].
     pub async fn get_job(&self, job_id: &str) -> JobResult<Option<JobInfo>> {
         let mut conn = self.pool.get().await?;
         let job_key = self.keys.job(job_id);
@@ -44,6 +50,13 @@ impl JobStatusTracker {
     }
 
     /// Get multiple jobs by ID.
+    ///
+    /// Entries that fail to deserialize are returned as `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails.
     pub async fn get_jobs(&self, job_ids: &[&str]) -> JobResult<Vec<Option<JobInfo>>> {
         if job_ids.is_empty() {
             return Ok(Vec::new());
@@ -65,27 +78,35 @@ impl JobStatusTracker {
     }
 
     /// Search jobs by various criteria.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails, or `JobError::Serialization`
+    /// if a matching job's stored data is not a valid serialized [`JobInfo`].
     pub async fn search_jobs(&self, query: JobSearchQuery) -> JobResult<JobSearchResult> { // NOSONAR
         let mut conn = self.pool.get().await?;
 
         // Determine which set to search based on status
         let set_key = match query.status {
-            Some(JobStatus::Pending) | Some(JobStatus::Scheduled) => {
+            Some(JobStatus::Pending | JobStatus::Scheduled) => {
                 self.keys.priority_queue(query.queue.as_deref().unwrap_or("default"))
             }
             Some(JobStatus::Running) => self.keys.active(),
             Some(JobStatus::Completed) => self.keys.completed(),
-            Some(JobStatus::Failed) | Some(JobStatus::DeadLetter) | Some(JobStatus::Cancelled) => self.keys.dlq(),
+            Some(JobStatus::Failed | JobStatus::DeadLetter | JobStatus::Cancelled) => self.keys.dlq(),
             None => {
                 // Search across all queues - for simplicity, search pending queue
                 self.keys.priority_queue(query.queue.as_deref().unwrap_or("default"))
             }
         };
 
-        // Get job IDs from the set
-        let job_ids: Vec<String> = conn
-            .zrange(&set_key, query.offset as isize, (query.offset + query.limit - 1) as isize)
-            .await?;
+        // Get job IDs from the set. limit == 0 fetches no jobs but still reports
+        // `total` below, so callers can ask for just the count.
+        let job_ids: Vec<String> = match redis_range_end(query.offset, query.limit) {
+            Some(end) => conn.zrange(&set_key, redis_index(query.offset), end).await?,
+            None => Vec::new(),
+        };
 
         // Get job data for each ID
         let mut jobs = Vec::new();
@@ -120,6 +141,13 @@ impl JobStatusTracker {
     }
 
     /// Get queue statistics.
+    ///
+    /// A missing or unreadable `failed` counter is reported as 0.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails while counting jobs.
     pub async fn get_queue_stats(&self, queue_name: &str) -> JobResult<QueueStats> {
         let mut conn = self.pool.get().await?;
 
@@ -158,6 +186,10 @@ impl JobStatusTracker {
     }
 
     /// Get statistics for all queues.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error from [`Self::get_queue_stats`].
     pub async fn get_all_stats(&self, queue_names: &[&str]) -> JobResult<Vec<QueueStats>> {
         let mut stats = Vec::new();
         for queue_name in queue_names {
@@ -167,6 +199,10 @@ impl JobStatusTracker {
     }
 
     /// Get aggregate dashboard statistics.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error from [`Self::get_queue_stats`].
     pub async fn get_dashboard_stats(&self, queue_names: &[&str]) -> JobResult<DashboardStats> {
         let all_stats = self.get_all_stats(queue_names).await?;
 
@@ -193,6 +229,12 @@ impl JobStatusTracker {
     }
 
     /// Get job history for a correlation ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails, or `JobError::Serialization`
+    /// if a job in the history is not a valid serialized [`JobInfo`].
     pub async fn get_job_history(&self, correlation_id: &str) -> JobResult<Vec<JobInfo>> {
         let mut conn = self.pool.get().await?;
 
@@ -214,19 +256,28 @@ impl JobStatusTracker {
     }
 
     /// Get recent job activity.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails, or `JobError::Serialization`
+    /// if a recent job is not a valid serialized [`JobInfo`].
     pub async fn get_recent_activity(&self, limit: usize) -> JobResult<Vec<JobActivity>> {
+        let Some(end) = redis_range_end(0, limit) else {
+            return Ok(Vec::new());
+        };
         let mut conn = self.pool.get().await?;
 
         // Get recently completed jobs
         let completed_key = self.keys.completed();
         let completed_ids: Vec<String> = conn
-            .zrevrange(&completed_key, 0, (limit - 1) as isize)
+            .zrevrange(&completed_key, 0, end)
             .await?;
 
         // Get recently failed jobs
         let dlq_key = self.keys.dlq();
         let failed_ids: Vec<String> = conn
-            .zrevrange(&dlq_key, 0, (limit - 1) as isize)
+            .zrevrange(&dlq_key, 0, end)
             .await?;
 
         let mut activities = Vec::new();
@@ -240,8 +291,12 @@ impl JobStatusTracker {
                     activity_type: ActivityType::Completed,
                     timestamp: info.completed_at.unwrap_or(info.created_at),
                     queue: info.queue.clone(),
+                    // A negative span (clock skew) is reported as 0 rather than wrapping.
                     duration_ms: info.completed_at.map(|c| {
-                        (c - info.started_at.unwrap_or(info.created_at)).num_milliseconds() as u64
+                        u64::try_from(
+                            (c - info.started_at.unwrap_or(info.created_at)).num_milliseconds(),
+                        )
+                        .unwrap_or(0)
                     }),
                     error: None,
                 });
@@ -271,6 +326,11 @@ impl JobStatusTracker {
     }
 
     /// Get throughput metrics.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails.
     pub async fn get_throughput(&self, queue_name: &str, period: ThroughputPeriod) -> JobResult<ThroughputMetrics> {
         let mut conn = self.pool.get().await?;
 
@@ -288,8 +348,14 @@ impl JobStatusTracker {
         };
 
         let completed_key = self.keys.completed();
-        let start_score = start_time.timestamp_millis() as f64;
-        let end_score = now.timestamp_millis() as f64;
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "Redis sorted-set scores are f64; millisecond timestamps stay exact up to 2^53 ms"
+        )]
+        let (start_score, end_score) = (
+            start_time.timestamp_millis() as f64,
+            now.timestamp_millis() as f64,
+        );
 
         // Count completed jobs in the time range
         let completed_count: u64 = conn
@@ -302,18 +368,15 @@ impl JobStatusTracker {
             .await?;
 
         let total_processed = completed_count + failed_count;
-        let duration_secs = (now - start_time).num_seconds() as f64;
-        let avg_per_second = if duration_secs > 0.0 {
-            total_processed as f64 / duration_secs
-        } else {
-            0.0
-        };
-
-        let success_rate = if total_processed > 0 {
-            (completed_count as f64 / total_processed as f64) * 100.0
-        } else {
-            100.0
-        };
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "window length in seconds (at most 7 days) is exactly representable in f64"
+        )]
+        let (avg_per_second, success_rate) = throughput_rates(
+            completed_count,
+            total_processed,
+            (now - start_time).num_seconds() as f64,
+        );
 
         Ok(ThroughputMetrics {
             queue: queue_name.to_string(),
@@ -328,6 +391,11 @@ impl JobStatusTracker {
     }
 
     /// Get worker health information.
+    ///
+    /// # Errors
+    ///
+    /// Returns `JobError::Pool` if no Redis connection is available or
+    /// `JobError::Redis` if a Redis command fails (`SCAN`, `TTL` or `GET`).
     pub async fn get_worker_health(&self) -> JobResult<Vec<WorkerHealth>> {
         let mut conn = self.pool.get().await?;
 
@@ -360,7 +428,7 @@ impl JobStatusTracker {
                     worker_id: worker_id.to_string(),
                     status: if ttl > 0 { WorkerStatus::Active } else { WorkerStatus::Stale },
                     last_heartbeat: last_heartbeat_time,
-                    ttl_remaining: if ttl > 0 { Some(ttl as u64) } else { None },
+                    ttl_remaining: u64::try_from(ttl).ok().filter(|&t| t > 0),
                 });
             }
 
@@ -372,6 +440,26 @@ impl JobStatusTracker {
 
         Ok(workers)
     }
+}
+
+/// Returns `(jobs per second, success rate in percent)` for a window.
+fn throughput_rates(completed: u64, total: u64, duration_secs: f64) -> (f64, f64) {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "rates and percentages are approximate f64 metrics; counts never approach 2^52"
+    )]
+    let (completed, total) = (completed as f64, total as f64);
+    let avg_per_second = if duration_secs > 0.0 {
+        total / duration_secs
+    } else {
+        0.0
+    };
+    let success_rate = if total > 0.0 {
+        (completed / total) * 100.0
+    } else {
+        100.0
+    };
+    (avg_per_second, success_rate)
 }
 
 /// Job search query.
@@ -398,6 +486,7 @@ pub struct JobSearchQuery {
 
 impl JobSearchQuery {
     /// Create a new search query with defaults.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             offset: 0,
@@ -407,36 +496,42 @@ impl JobSearchQuery {
     }
 
     /// Filter by status.
+    #[must_use]
     pub fn status(mut self, status: JobStatus) -> Self {
         self.status = Some(status);
         self
     }
 
     /// Filter by queue.
+    #[must_use]
     pub fn queue(mut self, queue: impl Into<String>) -> Self {
         self.queue = Some(queue.into());
         self
     }
 
     /// Filter by name.
+    #[must_use]
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
     /// Filter by tag.
+    #[must_use]
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
         self.tag = Some(tag.into());
         self
     }
 
     /// Set pagination offset.
+    #[must_use]
     pub fn offset(mut self, offset: usize) -> Self {
         self.offset = offset;
         self
     }
 
     /// Set pagination limit.
+    #[must_use]
     pub fn limit(mut self, limit: usize) -> Self {
         self.limit = limit;
         self

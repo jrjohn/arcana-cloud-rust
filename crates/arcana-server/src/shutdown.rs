@@ -7,6 +7,11 @@ use tracing::info;
 ///
 /// Kubernetes sends SIGTERM before the grace period starts, so every role
 /// awaits this rather than running until it is killed.
+///
+/// # Panics
+///
+/// Panics if the Ctrl+C handler or (on Unix) the SIGTERM handler cannot be
+/// installed with the OS.
 pub async fn wait_for_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
@@ -26,10 +31,10 @@ pub async fn wait_for_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
+        () = ctrl_c => {
             info!("Received Ctrl+C, initiating graceful shutdown...");
         }
-        _ = terminate => {
+        () = terminate => {
             info!("Received terminate signal, initiating graceful shutdown...");
         }
     }

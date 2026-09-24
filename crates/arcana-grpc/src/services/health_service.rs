@@ -17,19 +17,19 @@ pub struct HealthServiceImpl {
 
 impl HealthServiceImpl {
     /// Creates a new health service.
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
 
     /// Gets the health status for a service.
-    fn get_status(&self, service: &str) -> ServingStatus {
+    fn get_status(service: &str) -> ServingStatus {
         debug!("Health check for service: {}", service);
 
         // In a real implementation, check actual service health
         match service {
-            "" => ServingStatus::Serving, // Overall health
-            "arcana.user.UserService" => ServingStatus::Serving,
-            "arcana.auth.AuthService" => ServingStatus::Serving,
+            // "" = overall health
+            "" | "arcana.user.UserService" | "arcana.auth.AuthService" => ServingStatus::Serving,
             _ => ServingStatus::ServiceUnknown,
         }
     }
@@ -42,7 +42,7 @@ impl Health for HealthServiceImpl {
         request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
         let req = request.into_inner();
-        let status = self.get_status(&req.service);
+        let status = Self::get_status(&req.service);
 
         Ok(Response::new(HealthCheckResponse {
             status: status.into(),
@@ -56,7 +56,7 @@ impl Health for HealthServiceImpl {
         request: Request<HealthCheckRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
         let req = request.into_inner();
-        let status = self.get_status(&req.service);
+        let status = Self::get_status(&req.service);
 
         let (tx, rx) = tokio::sync::mpsc::channel(1);
 

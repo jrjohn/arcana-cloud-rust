@@ -17,12 +17,12 @@ use tracing::{debug, info};
 
 /// Creates a conflict message for duplicate username.
 fn conflict_username_msg(username: &str) -> String {
-    format!("Username '{}' already exists", username)
+    format!("Username '{username}' already exists")
 }
 
 /// Creates a conflict message for duplicate email.
 fn conflict_email_msg(email: &str) -> String {
-    format!("Email '{}' already exists", email)
+    format!("Email '{email}' already exists")
 }
 
 /// Generic user service implementation (non-DI).

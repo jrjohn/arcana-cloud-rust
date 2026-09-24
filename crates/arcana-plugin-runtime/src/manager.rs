@@ -24,6 +24,7 @@ pub struct LoadedPlugin {
 
 impl PluginManager {
     /// Creates a new plugin manager.
+    #[must_use]
     pub fn new(config: PluginConfig) -> Self {
         Self {
             plugins: Arc::new(RwLock::new(HashMap::new())),
@@ -32,6 +33,16 @@ impl PluginManager {
     }
 
     /// Initializes the plugin manager and loads plugins from the configured directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::PluginLoading`] if the plugin directory does not exist
+    /// and cannot be created, or if it exists but cannot be read.
+    #[allow(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "public async API kept stable; real WASM plugin loading will await"
+    )]
     pub async fn initialize(&self) -> ArcanaResult<()> {
         if !self.config.enabled {
             info!("Plugin system is disabled");
@@ -42,19 +53,19 @@ impl PluginManager {
         if !plugin_dir.exists() {
             info!("Plugin directory does not exist, creating: {}", self.config.directory);
             std::fs::create_dir_all(plugin_dir).map_err(|e| {
-                ArcanaError::PluginLoading(format!("Failed to create plugin directory: {}", e))
+                ArcanaError::PluginLoading(format!("Failed to create plugin directory: {e}"))
             })?;
         }
 
         // Scan for plugins
-        self.scan_plugins().await?;
+        self.scan_plugins()?;
 
         info!("Plugin manager initialized");
         Ok(())
     }
 
     /// Scans the plugin directory for plugins.
-    async fn scan_plugins(&self) -> ArcanaResult<()> {
+    fn scan_plugins(&self) -> ArcanaResult<()> {
         let plugin_dir = Path::new(&self.config.directory);
 
         if !plugin_dir.is_dir() {
@@ -62,7 +73,7 @@ impl PluginManager {
         }
 
         let entries = std::fs::read_dir(plugin_dir).map_err(|e| {
-            ArcanaError::PluginLoading(format!("Failed to read plugin directory: {}", e))
+            ArcanaError::PluginLoading(format!("Failed to read plugin directory: {e}"))
         })?;
 
         for entry in entries.flatten() {
@@ -77,6 +88,12 @@ impl PluginManager {
     }
 
     /// Installs a plugin from WASM bytes.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error: WASM compilation is not implemented yet and
+    /// a placeholder plugin is always registered. The `Result` is kept for when real
+    /// module compilation/instantiation can fail.
     pub async fn install_plugin(&self, wasm_bytes: &[u8]) -> ArcanaResult<PluginId> {
         info!("Installing plugin from WASM bytes ({} bytes)", wasm_bytes.len());
 
@@ -107,6 +124,10 @@ impl PluginManager {
     }
 
     /// Enables a plugin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::PluginNotFound`] if no plugin with `plugin_id` is installed.
     pub async fn enable_plugin(&self, plugin_id: &PluginId) -> ArcanaResult<()> {
         let mut plugins = self.plugins.write().await;
         let plugin = plugins.get_mut(plugin_id).ok_or_else(|| {
@@ -120,6 +141,10 @@ impl PluginManager {
     }
 
     /// Disables a plugin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::PluginNotFound`] if no plugin with `plugin_id` is installed.
     pub async fn disable_plugin(&self, plugin_id: &PluginId) -> ArcanaResult<()> {
         let mut plugins = self.plugins.write().await;
         let plugin = plugins.get_mut(plugin_id).ok_or_else(|| {
@@ -133,6 +158,10 @@ impl PluginManager {
     }
 
     /// Uninstalls a plugin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::PluginNotFound`] if no plugin with `plugin_id` is installed.
     pub async fn uninstall_plugin(&self, plugin_id: &PluginId) -> ArcanaResult<()> {
         let mut plugins = self.plugins.write().await;
 
@@ -165,6 +194,6 @@ impl std::fmt::Debug for PluginManager {
         f.debug_struct("PluginManager")
             .field("enabled", &self.config.enabled)
             .field("directory", &self.config.directory)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

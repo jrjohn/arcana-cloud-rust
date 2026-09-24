@@ -10,10 +10,10 @@ use std::time::Duration;
 use tracing::debug;
 
 /// Default TTL for cached items (5 minutes).
-pub const DEFAULT_TTL: Duration = Duration::from_secs(300);
+pub const DEFAULT_TTL: Duration = Duration::from_mins(5);
 
 /// Short TTL for existence checks (1 minute).
-pub const SHORT_TTL: Duration = Duration::from_secs(60);
+pub const SHORT_TTL: Duration = Duration::from_mins(1);
 
 /// Redis-based cache service.
 #[derive(Component)]
@@ -59,7 +59,7 @@ impl RedisCacheService {
     async fn get_conn(&self) -> ArcanaResult<deadpool_redis::Connection> {
         match &self.pool {
             Some(pool) => pool.get().await.map_err(|e| {
-                ArcanaError::Cache(format!("Failed to get Redis connection: {}", e))
+                ArcanaError::Cache(format!("Failed to get Redis connection: {e}"))
             }),
             None => Err(ArcanaError::Cache("Cache is disabled".to_string())),
         }
@@ -79,13 +79,10 @@ impl CacheInterface for RedisCacheService {
 
         let mut conn = self.get_conn().await?;
         let value: Option<String> = conn.get(key).await.map_err(|e| {
-            ArcanaError::Cache(format!("Failed to get key '{}': {}", key, e))
+            ArcanaError::Cache(format!("Failed to get key '{key}': {e}"))
         })?;
 
-        match &value {
-            Some(_) => debug!("Cache hit for key '{}'", key),
-            None => debug!("Cache miss for key '{}'", key),
-        }
+        if value.is_some() { debug!("Cache hit for key '{}'", key) } else { debug!("Cache miss for key '{}'", key) }
 
         Ok(value)
     }
@@ -99,7 +96,7 @@ impl CacheInterface for RedisCacheService {
         let ttl_secs = ttl.as_secs().max(1);
 
         conn.set_ex::<_, _, ()>(key, value, ttl_secs).await.map_err(|e| {
-            ArcanaError::Cache(format!("Failed to set key '{}': {}", key, e))
+            ArcanaError::Cache(format!("Failed to set key '{key}': {e}"))
         })?;
 
         debug!("Cached key '{}' with TTL {}s", key, ttl_secs);
@@ -113,7 +110,7 @@ impl CacheInterface for RedisCacheService {
 
         let mut conn = self.get_conn().await?;
         let deleted: i64 = conn.del(key).await.map_err(|e| {
-            ArcanaError::Cache(format!("Failed to delete key '{}': {}", key, e))
+            ArcanaError::Cache(format!("Failed to delete key '{key}': {e}"))
         })?;
 
         debug!("Deleted key '{}': {}", key, deleted > 0);
@@ -127,7 +124,7 @@ impl CacheInterface for RedisCacheService {
 
         let mut conn = self.get_conn().await?;
         let exists: bool = conn.exists(key).await.map_err(|e| {
-            ArcanaError::Cache(format!("Failed to check key '{}': {}", key, e))
+            ArcanaError::Cache(format!("Failed to check key '{key}': {e}"))
         })?;
 
         Ok(exists)
@@ -145,7 +142,7 @@ impl CacheInterface for RedisCacheService {
             .arg(pattern)
             .query_async(&mut conn)
             .await
-            .map_err(|e| ArcanaError::Cache(format!("Failed to scan keys: {}", e)))?;
+            .map_err(|e| ArcanaError::Cache(format!("Failed to scan keys: {e}")))?;
 
         if keys.is_empty() {
             return Ok(0);
@@ -153,11 +150,13 @@ impl CacheInterface for RedisCacheService {
 
         // Delete all matching keys
         let deleted: i64 = conn.del(&keys).await.map_err(|e| {
-            ArcanaError::Cache(format!("Failed to delete keys: {}", e))
+            ArcanaError::Cache(format!("Failed to delete keys: {e}"))
         })?;
 
         debug!("Deleted {} keys matching pattern '{}'", deleted, pattern);
-        Ok(deleted as u64)
+        u64::try_from(deleted).map_err(|_| {
+            ArcanaError::Cache(format!("Redis DEL returned a negative count: {deleted}"))
+        })
     }
 }
 

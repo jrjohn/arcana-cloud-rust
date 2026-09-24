@@ -8,7 +8,7 @@ const CACHE_PREFIX: &str = "arcana:cache";
 /// Generate a cache key for a user by ID.
 #[must_use]
 pub fn user_by_id(id: UserId) -> String {
-    format!("{}:user:id:{}", CACHE_PREFIX, id)
+    format!("{CACHE_PREFIX}:user:id:{id}")
 }
 
 /// Generate a cache key for a user by username.
@@ -32,19 +32,19 @@ pub fn email_exists(email: &str) -> String {
 /// Pattern to invalidate all user-related cache entries for a specific user ID.
 #[must_use]
 pub fn user_invalidation_pattern(id: UserId) -> String {
-    format!("{}:user:*:{}*", CACHE_PREFIX, id)
+    format!("{CACHE_PREFIX}:user:*:{id}*")
 }
 
 /// Pattern to invalidate all username existence checks.
 #[must_use]
 pub fn username_exists_pattern() -> String {
-    format!("{}:exists:username:*", CACHE_PREFIX)
+    format!("{CACHE_PREFIX}:exists:username:*")
 }
 
 /// Pattern to invalidate all email existence checks.
 #[must_use]
 pub fn email_exists_pattern() -> String {
-    format!("{}:exists:email:*", CACHE_PREFIX)
+    format!("{CACHE_PREFIX}:exists:email:*")
 }
 
 #[cfg(test)]

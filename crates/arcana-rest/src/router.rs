@@ -28,7 +28,7 @@ use utoipa_swagger_ui::SwaggerUi;
 /// Creates the main application router from a Shaku module.
 ///
 /// This is the preferred way to create the router, using Shaku for dependency injection.
-/// The module must provide UserService, AuthService, and TokenProviderInterface components.
+/// The module must provide `UserService`, `AuthService`, and `TokenProviderInterface` components.
 pub fn create_router<M>(module: &M, server_config: &ServerConfig) -> Router
 where
     M: Module

@@ -67,7 +67,7 @@ impl IntoResponse for ValidatedJsonRejection {
             Self::JsonError(rejection) => {
                 let error_response = ErrorResponse {
                     code: "INVALID_JSON".to_string(),
-                    message: format!("Invalid JSON: {}", rejection),
+                    message: format!("Invalid JSON: {rejection}"),
                     details: None,
                     trace_id: None,
                 };
@@ -95,9 +95,7 @@ fn convert_validation_errors(errors: &ValidationErrors) -> Vec<FieldError> { // 
         for err in field_errs {
             let message = err
                 .message
-                .as_ref()
-                .map(|m| m.to_string())
-                .unwrap_or_else(|| format!("Validation failed for field '{}'", field));
+                .as_ref().map_or_else(|| format!("Validation failed for field '{field}'"), std::string::ToString::to_string);
 
             let code = err.code.to_string();
 

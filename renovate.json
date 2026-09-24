@@ -1,4 +1,22 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>jrjohn/renovate-config"]
+  "extends": ["github>jrjohn/renovate-config"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Rust toolchain pinned in rust-toolchain.toml (same version as the rust:<ver> Docker images)",
+      "managerFilePatterns": ["/(^|/)rust-toolchain\\.toml$/"],
+      "matchStrings": ["channel\\s*=\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "depNameTemplate": "rust",
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Bump rust-toolchain.toml and every FROM rust:<ver> together; new clippy lints get fixed in that PR",
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["rust"],
+      "groupName": "Rust toolchain"
+    }
+  ]
 }
