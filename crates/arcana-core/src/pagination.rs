@@ -75,7 +75,7 @@ impl PageInfo {
     #[must_use]
     pub fn new(page: usize, size: usize, total_elements: u64, number_of_elements: usize) -> Self {
         let total_pages = if size > 0 {
-            (total_elements + size as u64 - 1) / size as u64
+            total_elements.div_ceil(size as u64)
         } else {
             0
         };

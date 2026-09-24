@@ -8,6 +8,7 @@ use std::time::Duration;
 
 /// Root application configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct AppConfig {
     /// Application name and metadata.
     #[serde(default)]
@@ -46,21 +47,6 @@ pub struct AppConfig {
     pub observability: ObservabilityConfig,
 }
 
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            app: AppMetadata::default(),
-            server: ServerConfig::default(),
-            deployment: DeploymentConfig::default(),
-            database: DatabaseConfig::default(),
-            redis: RedisConfig::default(),
-            security: SecurityConfig::default(),
-            plugins: PluginConfig::default(),
-            ssr: SsrConfig::default(),
-            observability: ObservabilityConfig::default(),
-        }
-    }
-}
 
 /// Application metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]

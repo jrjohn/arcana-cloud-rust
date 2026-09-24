@@ -4,7 +4,6 @@ use crate::dto::{
     AuthResponse, AuthUserInfo, LoginRequest, MessageResponse, RefreshTokenRequest, RegisterRequest,
 };
 use arcana_core::{ArcanaResult, Interface, UserId};
-use arcana_repository::UserRepository;
 use arcana_security::Claims;
 use async_trait::async_trait;
 

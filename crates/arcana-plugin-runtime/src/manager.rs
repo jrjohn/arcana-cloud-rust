@@ -67,7 +67,7 @@ impl PluginManager {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "wasm") {
+            if path.extension().is_some_and(|ext| ext == "wasm") {
                 debug!("Found plugin: {:?}", path);
                 // In a full implementation, load the plugin here
             }

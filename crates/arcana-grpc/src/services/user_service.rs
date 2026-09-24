@@ -69,7 +69,7 @@ impl user::user_service_server::UserService for UserGrpcService {
         debug!("gRPC ListUsers");
 
         let page_request = req.page.map_or_else(
-            || PageRequest::default(),
+            PageRequest::default,
             |p| PageRequest::new(p.page as usize, p.size as usize),
         );
 

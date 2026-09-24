@@ -54,7 +54,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .register(proto_request)
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(from_proto_auth_response(response.into_inner()))
     }
@@ -73,7 +73,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .login(proto_request)
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(from_proto_auth_response(response.into_inner()))
     }
@@ -90,7 +90,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .refresh_token(proto_request)
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(from_proto_auth_response(response.into_inner()))
     }
@@ -107,7 +107,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .validate_token(proto_request)
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let inner = response.into_inner();
 
@@ -151,7 +151,7 @@ impl AuthService for RemoteAuthServiceClient {
             .clone()
             .logout(proto_request)
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(MessageResponse::new("Successfully logged out"))
     }

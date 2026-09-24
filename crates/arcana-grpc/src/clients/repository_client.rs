@@ -96,7 +96,7 @@ impl UserRepository for RemoteUserRepository {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -111,7 +111,7 @@ impl UserRepository for RemoteUserRepository {
                 username: username.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -126,7 +126,7 @@ impl UserRepository for RemoteUserRepository {
                 email: email.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -141,7 +141,7 @@ impl UserRepository for RemoteUserRepository {
                 identifier: identifier.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().user.map(|u| from_proto_user_data(&u)))
     }
@@ -156,7 +156,7 @@ impl UserRepository for RemoteUserRepository {
                 username: username.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().exists)
     }
@@ -171,7 +171,7 @@ impl UserRepository for RemoteUserRepository {
                 email: email.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().exists)
     }
@@ -189,7 +189,7 @@ impl UserRepository for RemoteUserRepository {
                 }),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let inner = response.into_inner();
         let page_info = inner.page_info.unwrap_or_default();
@@ -217,7 +217,7 @@ impl UserRepository for RemoteUserRepository {
                 }),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let inner = response.into_inner();
         let page_info = inner.page_info.unwrap_or_default();
@@ -241,7 +241,7 @@ impl UserRepository for RemoteUserRepository {
                 user: Some(to_proto_user_data(user)),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let saved = response
             .into_inner()
@@ -261,7 +261,7 @@ impl UserRepository for RemoteUserRepository {
                 user: Some(to_proto_user_data(user)),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         let updated = response
             .into_inner()
@@ -281,7 +281,7 @@ impl UserRepository for RemoteUserRepository {
                 user_id: id.to_string(),
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().deleted)
     }
@@ -294,7 +294,7 @@ impl UserRepository for RemoteUserRepository {
             .clone()
             .count_users(repository::CountUsersRequest {})
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().count)
     }
@@ -309,7 +309,7 @@ impl UserRepository for RemoteUserRepository {
                 role: to_proto_role(role) as i32,
             })
             .await
-            .map_err(|e| map_grpc_error(e))?;
+            .map_err(map_grpc_error)?;
 
         Ok(response.into_inner().count)
     }
@@ -356,13 +356,13 @@ fn from_proto_user_data(user: &repository::UserData) -> User {
         .created_at
         .as_ref()
         .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
-        .unwrap_or_else(|| chrono::Utc::now());
+        .unwrap_or_else(chrono::Utc::now);
 
     let updated_at = user
         .updated_at
         .as_ref()
         .and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
-        .unwrap_or_else(|| chrono::Utc::now());
+        .unwrap_or_else(chrono::Utc::now);
 
     let last_login_at = user
         .last_login_at
