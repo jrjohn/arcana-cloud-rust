@@ -2,7 +2,7 @@
 # Multi-stage build for minimal image size
 
 # Build stage - using bookworm for latest Rust
-FROM rust:1.98.0 AS builder
+FROM rust:1.98.1 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \

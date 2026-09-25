@@ -3,7 +3,7 @@
 # Uses cargo-llvm-cov for native ARM64 support
 # (avoids QEMU-based tarpaulin which SIGSEGV on aarch64 hosts)
 # ============================================
-FROM rust:1.98.0
+FROM rust:1.98.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev protobuf-compiler && \
