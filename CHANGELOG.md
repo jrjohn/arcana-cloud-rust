@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.10](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.9...v1.1.10) (2026-09-25)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate hyper-util to v0.1.21 ([#133](https://github.com/jrjohn/arcana-cloud-rust/issues/133)) ([26f7e5d](https://github.com/jrjohn/arcana-cloud-rust/commit/26f7e5d8bcd910cba56a2f06316b1958c10ceb12))
+* **deps:** update rust crate wasmtime-wasi to v49.0.1 ([#134](https://github.com/jrjohn/arcana-cloud-rust/issues/134)) ([b20dc1a](https://github.com/jrjohn/arcana-cloud-rust/commit/b20dc1a1bc41ddfa01eb019e179130ad35d96c76))
+
 ## [1.1.9](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.8...v1.1.9) (2026-09-24)
 
 
