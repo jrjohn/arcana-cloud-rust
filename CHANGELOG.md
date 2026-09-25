@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.11](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.10...v1.1.11) (2026-09-25)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate redis to v1.7.1 ([#136](https://github.com/jrjohn/arcana-cloud-rust/issues/136)) ([a721b7a](https://github.com/jrjohn/arcana-cloud-rust/commit/a721b7a3cdb2494499061d00a701c0d313e40c2d))
+* **deps:** update rust crate tokio-test to v0.4.6 ([#137](https://github.com/jrjohn/arcana-cloud-rust/issues/137)) ([0f2961f](https://github.com/jrjohn/arcana-cloud-rust/commit/0f2961ff8484cbd0758d47d736a4875d9c773081))
+
 ## [1.1.10](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.9...v1.1.10) (2026-09-25)
 
 
