@@ -69,7 +69,7 @@ dotenvy = "0.15"
 
 # Security
 jsonwebtoken = { version = "11.0", features = ["rust_crypto"] }
-argon2 = "0.5"
+argon2 = "0.6"
 uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
 
 # WASM Plugin Runtime
