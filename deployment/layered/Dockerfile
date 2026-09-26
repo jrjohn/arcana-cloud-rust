@@ -7,7 +7,7 @@
 #   docker build --build-arg LAYER=repository -t arcana-repository .
 
 # Build stage
-FROM rust:1.98.0 AS builder
+FROM rust:1.98.1 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
