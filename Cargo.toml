@@ -83,7 +83,7 @@ backoff = { version = "0.4", features = ["tokio"] }
 # Observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = "0.33"
+tracing-opentelemetry = "0.34"
 opentelemetry = "0.33"
 opentelemetry_sdk = { version = "0.33", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.33", features = ["grpc-tonic"] }
