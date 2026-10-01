@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.14](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.13...v1.1.14) (2026-10-01)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate config to v0.15.27 ([#145](https://github.com/jrjohn/arcana-cloud-rust/issues/145)) ([20d62aa](https://github.com/jrjohn/arcana-cloud-rust/commit/20d62aaa7834562b2641570d0714c95c4ec4a70a))
+* **deps:** update rust crate jsonwebtoken to v11.1.0 ([#146](https://github.com/jrjohn/arcana-cloud-rust/issues/146)) ([9870334](https://github.com/jrjohn/arcana-cloud-rust/commit/987033454e1afd4943f41d60ab0c957953d988c6))
+
 ## [1.1.13](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.12...v1.1.13) (2026-10-01)
 
 
