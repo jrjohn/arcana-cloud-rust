@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.13](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.12...v1.1.13) (2026-10-01)
+
+
+### Bug Fixes
+
+* **deps:** update opentelemetry-rust monorepo to 0.33 ([#142](https://github.com/jrjohn/arcana-cloud-rust/issues/142)) ([62f416e](https://github.com/jrjohn/arcana-cloud-rust/commit/62f416e4ac5fbb940cd5e816434c00840e7cd195))
+* **deps:** update rust crate argon2 to 0.6 ([#143](https://github.com/jrjohn/arcana-cloud-rust/issues/143)) ([5f4ff00](https://github.com/jrjohn/arcana-cloud-rust/commit/5f4ff00c10a0c7967ed491e36baeaa311a8bf130))
+
 ## [1.1.12](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.11...v1.1.12) (2026-09-26)
 
 
