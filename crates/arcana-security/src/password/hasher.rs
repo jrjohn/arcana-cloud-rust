@@ -2,8 +2,8 @@
 
 use arcana_core::{ArcanaError, ArcanaResult, Interface};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher as _, PasswordVerifier, SaltString},
-    Argon2, Params,
+    password_hash::{Error as PasswordHashError, PasswordHasher as _, PasswordVerifier},
+    Argon2, Params, PasswordHash,
 };
 use shaku::Component;
 use std::sync::Arc;
@@ -86,11 +86,11 @@ impl PasswordHasher {
     /// Returns [`ArcanaError::Internal`] if Argon2 fails to hash the password
     /// (e.g. the password exceeds Argon2's maximum input length).
     pub fn hash(&self, password: &str) -> ArcanaResult<String> {
-        let salt = SaltString::generate(&mut OsRng);
-
+        // `hash_password` draws a 16-byte random salt from the OS RNG
+        // (same length `SaltString::generate` used under argon2 0.5).
         let hash = self
             .argon2
-            .hash_password(password.as_bytes(), &salt)
+            .hash_password(password.as_bytes())
             .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {e}")))?;
 
         debug!("Password hashed successfully");
@@ -108,12 +108,15 @@ impl PasswordHasher {
         let parsed_hash = PasswordHash::new(hash)
             .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {e}")))?;
 
-        match self.argon2.verify_password(password.as_bytes(), &parsed_hash) {
+        match self
+            .argon2
+            .verify_password(password.as_bytes(), &parsed_hash)
+        {
             Ok(()) => {
                 debug!("Password verified successfully");
                 Ok(true)
             }
-            Err(argon2::password_hash::Error::Password) => {
+            Err(PasswordHashError::PasswordInvalid) => {
                 debug!("Password verification failed: incorrect password");
                 Ok(false)
             }
@@ -148,11 +151,11 @@ impl Default for PasswordHasher {
 
 impl PasswordHasherInterface for PasswordHasher {
     fn hash(&self, password: &str) -> ArcanaResult<String> {
-        let salt = SaltString::generate(&mut OsRng);
-
+        // `hash_password` draws a 16-byte random salt from the OS RNG
+        // (same length `SaltString::generate` used under argon2 0.5).
         let hash = self
             .argon2
-            .hash_password(password.as_bytes(), &salt)
+            .hash_password(password.as_bytes())
             .map_err(|e| ArcanaError::Internal(format!("Failed to hash password: {e}")))?;
 
         debug!("Password hashed successfully");
@@ -163,12 +166,15 @@ impl PasswordHasherInterface for PasswordHasher {
         let parsed_hash = PasswordHash::new(hash)
             .map_err(|e| ArcanaError::Internal(format!("Invalid password hash format: {e}")))?;
 
-        match self.argon2.verify_password(password.as_bytes(), &parsed_hash) {
+        match self
+            .argon2
+            .verify_password(password.as_bytes(), &parsed_hash)
+        {
             Ok(()) => {
                 debug!("Password verified successfully");
                 Ok(true)
             }
-            Err(argon2::password_hash::Error::Password) => {
+            Err(PasswordHashError::PasswordInvalid) => {
                 debug!("Password verification failed: incorrect password");
                 Ok(false)
             }
@@ -369,13 +375,64 @@ mod tests {
         let hasher = PasswordHasher::new();
         let hash = hasher.hash("TestPass!1").unwrap();
         assert!(!PasswordHasherInterface::needs_rehash(&hasher, &hash));
-        assert!(PasswordHasherInterface::needs_rehash(&hasher, "garbage-hash"));
+        assert!(PasswordHasherInterface::needs_rehash(
+            &hasher,
+            "garbage-hash"
+        ));
+    }
+
+    /// PHC strings produced by argon2 0.5.3 (`PasswordHasher::new()` and
+    /// `PasswordHasher::with_cost(1)`) for `LEGACY_PASSWORD`. Hashes already
+    /// stored in the database must keep verifying after the argon2 upgrade.
+    const LEGACY_PASSWORD: &str = "Legacy-Passw0rd!";
+    const LEGACY_HASH_DEFAULT: &str = "$argon2id$v=19$m=19456,t=2,p=1$O3zoL6vzaMUXLuCgn/aWwg$XWB3x6BG/ZNvzNxNCeNsQR7xVUGmWKbS3Pv5S2kiyxU";
+    const LEGACY_HASH_COST1: &str = "$argon2id$v=19$m=1024,t=3,p=1$Pj9d8SxsMBjYJZClxrE+xg$sv5el3PIWFirXHf6I/ImqPShbF74B8/xS350iqc773A";
+
+    #[test]
+    fn test_legacy_hash_verifies_with_correct_password() {
+        let hasher = PasswordHasher::new();
+        assert!(hasher.verify(LEGACY_PASSWORD, LEGACY_HASH_DEFAULT).unwrap());
+        // Parameters come from the PHC string, not from the hasher's config.
+        assert!(hasher.verify(LEGACY_PASSWORD, LEGACY_HASH_COST1).unwrap());
+        assert!(
+            PasswordHasherInterface::verify(&hasher, LEGACY_PASSWORD, LEGACY_HASH_DEFAULT).unwrap()
+        );
+        assert!(!hasher.needs_rehash(LEGACY_HASH_DEFAULT));
+    }
+
+    #[test]
+    fn test_legacy_hash_wrong_password_is_ok_false_not_error() {
+        let hasher = PasswordHasher::new();
+        for hash in [LEGACY_HASH_DEFAULT, LEGACY_HASH_COST1] {
+            assert!(!hasher.verify("Legacy-Passw0rd?", hash).unwrap());
+            assert!(!PasswordHasherInterface::verify(&hasher, "", hash).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_hash_keeps_phc_format_and_default_params() {
+        let hash = PasswordHasher::new().hash(LEGACY_PASSWORD).unwrap();
+        assert!(
+            hash.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"),
+            "{hash}"
+        );
+        // 16-byte salt -> 22 base64 chars, 32-byte output -> 43 chars.
+        let parts: Vec<&str> = hash.split('$').collect();
+        assert_eq!(parts[4].len(), 22);
+        assert_eq!(parts[5].len(), 43);
+    }
+
+    #[test]
+    fn test_unsupported_algorithm_is_error_not_wrong_password() {
+        let hasher = PasswordHasher::new();
+        let pbkdf = "$pbkdf2-sha256$i=1000$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaGhhc2g";
+        assert!(hasher.verify("whatever", pbkdf).is_err());
     }
 
     #[test]
     fn test_hasher_debug_does_not_leak_secrets() {
         let hasher = PasswordHasher::new();
-        let debug_str = format!("{:?}", hasher);
+        let debug_str = format!("{hasher:?}");
         assert!(debug_str.contains("PasswordHasher"));
     }
 }
