@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.17](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.16...v1.1.17) (2026-10-04)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate testcontainers to 0.28 ([#150](https://github.com/jrjohn/arcana-cloud-rust/issues/150)) ([d3c2b25](https://github.com/jrjohn/arcana-cloud-rust/commit/d3c2b2560155c23c2a54ae9c3c226af11af816e7))
+
 ## [1.1.16](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.15...v1.1.16) (2026-10-04)
 
 
