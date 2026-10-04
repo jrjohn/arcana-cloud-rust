@@ -3,14 +3,34 @@
 use arcana_config::DatabaseConfig;
 use arcana_repository::DatabasePool;
 use std::sync::Arc;
-use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
-use testcontainers_modules::mysql::Mysql;
+use testcontainers::{
+    core::{IntoContainerPort, WaitFor},
+    runners::AsyncRunner,
+    ContainerAsync, GenericImage, ImageExt,
+};
+
+/// MySQL image used for integration tests.
+///
+/// Built from `GenericImage` instead of `testcontainers_modules::mysql::Mysql`:
+/// testcontainers-modules 0.15 (latest) requires testcontainers ^0.27 and cannot
+/// be resolved together with testcontainers 0.28. Name, tag and ready conditions
+/// match the module's definition.
+fn mysql_image() -> GenericImage {
+    GenericImage::new("mysql", "8.1")
+        .with_exposed_port(3306.tcp())
+        .with_wait_for(WaitFor::message_on_stderr(
+            "X Plugin ready for connections. Bind-address",
+        ))
+        .with_wait_for(WaitFor::message_on_stderr(
+            "/usr/sbin/mysqld: ready for connections.",
+        ))
+}
 
 /// Test database container wrapper.
 ///
 /// Manages a MySQL testcontainer lifecycle and provides a database pool.
 pub struct TestDatabase {
-    _container: ContainerAsync<Mysql>,
+    _container: ContainerAsync<GenericImage>,
     pool: Arc<DatabasePool>,
 }
 
@@ -20,7 +40,7 @@ impl TestDatabase {
     /// Runs migrations automatically after container startup.
     pub async fn new() -> Self {
         // Start MySQL container
-        let container = Mysql::default()
+        let container = mysql_image()
             .with_env_var("MYSQL_ROOT_PASSWORD", "testpass")
             .with_env_var("MYSQL_DATABASE", "arcana_test")
             .with_env_var("MYSQL_USER", "arcana")
