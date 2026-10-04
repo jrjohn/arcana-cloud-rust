@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.16](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.15...v1.1.16) (2026-10-04)
+
+
+### Bug Fixes
+
+* **deps:** update rust docker tag to v1.99.0 ([#151](https://github.com/jrjohn/arcana-cloud-rust/issues/151)) ([bc954a0](https://github.com/jrjohn/arcana-cloud-rust/commit/bc954a0ca8471079f1c0de0a88d7e565e9385fbe))
+
 ## [1.1.15](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.14...v1.1.15) (2026-10-01)
 
 
