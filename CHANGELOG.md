@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.19](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.18...v1.1.19) (2026-10-04)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate uuid to v1.27.0 ([#157](https://github.com/jrjohn/arcana-cloud-rust/issues/157)) ([5f6279a](https://github.com/jrjohn/arcana-cloud-rust/commit/5f6279abb011db826345bdb060cb52abb03465da))
+
 ## [1.1.18](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.17...v1.1.18) (2026-10-04)
 
 
