@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.20](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.19...v1.1.20) (2026-10-06)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate hyper to v1.12.0 ([#159](https://github.com/jrjohn/arcana-cloud-rust/issues/159)) ([43b3d1b](https://github.com/jrjohn/arcana-cloud-rust/commit/43b3d1b5f840ce1a460f525936cb83db82ad6dfe))
+
 ## [1.1.19](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.18...v1.1.19) (2026-10-04)
 
 
