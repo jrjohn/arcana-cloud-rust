@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.21](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.20...v1.1.21) (2026-10-08)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate toml to v1.1.7 ([#161](https://github.com/jrjohn/arcana-cloud-rust/issues/161)) ([660eaa0](https://github.com/jrjohn/arcana-cloud-rust/commit/660eaa0e8c87f6767aafeec659f4f1651f580d27))
+
 ## [1.1.20](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.19...v1.1.20) (2026-10-06)
 
 
