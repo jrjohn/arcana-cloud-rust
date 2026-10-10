@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.23](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.22...v1.1.23) (2026-10-10)
+
+
+### Bug Fixes
+
+* **deps:** update opentelemetry-rust monorepo to v0.33.1 ([#165](https://github.com/jrjohn/arcana-cloud-rust/issues/165)) ([77896e0](https://github.com/jrjohn/arcana-cloud-rust/commit/77896e0999021106976e9a4cb1a43ef8c5e452e9))
+
 ## [1.1.22](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.21...v1.1.22) (2026-10-09)
 
 
