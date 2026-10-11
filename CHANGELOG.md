@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.25](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.24...v1.1.25) (2026-10-10)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate serde_json to v1.0.152 ([#169](https://github.com/jrjohn/arcana-cloud-rust/issues/169)) ([6b1ed28](https://github.com/jrjohn/arcana-cloud-rust/commit/6b1ed28d429b0ea5697809625f204ea0e69f3ec1))
+
 ## [1.1.24](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.23...v1.1.24) (2026-10-10)
 
 
