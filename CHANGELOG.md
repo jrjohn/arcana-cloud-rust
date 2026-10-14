@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.27](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.26...v1.1.27) (2026-10-13)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate tokio to v1.53.3 ([#173](https://github.com/jrjohn/arcana-cloud-rust/issues/173)) ([dc51de4](https://github.com/jrjohn/arcana-cloud-rust/commit/dc51de4d3093dbf7f2f823fc35a469137f23963d))
+
 ## [1.1.26](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.25...v1.1.26) (2026-10-11)
 
 
