@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.30](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.29...v1.1.30) (2026-10-18)
+
+
+### Bug Fixes
+
+* **ci:** revert rust docker base image to 1.99.0, 1.99.1 breaks aws-lc-sys build ([4ea4ce3](https://github.com/jrjohn/arcana-cloud-rust/commit/4ea4ce3de50fb71f93a9ef1d0beec8438275bebe))
+* **deps:** update rust docker tag to v1.99.1 ([#181](https://github.com/jrjohn/arcana-cloud-rust/issues/181)) ([c01be13](https://github.com/jrjohn/arcana-cloud-rust/commit/c01be13189264830ab8a4edaa1498ef044080abe))
+
 ## [1.1.29](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.28...v1.1.29) (2026-10-17)
 
 
