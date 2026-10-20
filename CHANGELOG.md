@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.31](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.30...v1.1.31) (2026-10-20)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate tokio to v1.54.0 ([#183](https://github.com/jrjohn/arcana-cloud-rust/issues/183)) ([84ddada](https://github.com/jrjohn/arcana-cloud-rust/commit/84ddadab34668949384f2b65ee251df11908202f))
+* **deps:** update rust crate wasmtime-wasi to v49.0.4 ([#182](https://github.com/jrjohn/arcana-cloud-rust/issues/182)) ([b5ec0bd](https://github.com/jrjohn/arcana-cloud-rust/commit/b5ec0bd4b1a9c87b14e2875a75b5696dcec23552))
+
 ## [1.1.30](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.29...v1.1.30) (2026-10-18)
 
 
