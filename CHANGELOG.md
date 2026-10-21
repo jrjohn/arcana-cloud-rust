@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.33](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.32...v1.1.33) (2026-10-21)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate utoipa-swagger-ui to v10.0.2 ([#188](https://github.com/jrjohn/arcana-cloud-rust/issues/188)) ([aa8a472](https://github.com/jrjohn/arcana-cloud-rust/commit/aa8a4720964869ea19611f00516ce43a4552dbf4))
+* **deps:** update rust crate wasmtime to v50 ([#185](https://github.com/jrjohn/arcana-cloud-rust/issues/185)) ([72238b1](https://github.com/jrjohn/arcana-cloud-rust/commit/72238b1360ff4e4e34814b790b5f5afe8b6ba358))
+
 ## [1.1.32](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.31...v1.1.32) (2026-10-21)
 
 
