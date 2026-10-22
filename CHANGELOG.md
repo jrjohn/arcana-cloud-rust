@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.35](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.34...v1.1.35) (2026-10-22)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate parking_lot to 0.13 ([#193](https://github.com/jrjohn/arcana-cloud-rust/issues/193)) ([99786bf](https://github.com/jrjohn/arcana-cloud-rust/commit/99786bff82ea23b810dac014f955f64ce93d4ced))
+
 ## [1.1.34](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.33...v1.1.34) (2026-10-22)
 
 
