@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.34](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.33...v1.1.34) (2026-10-22)
+
+
+### Bug Fixes
+
+* **deps:** update mysql docker tag to v26.10 ([#191](https://github.com/jrjohn/arcana-cloud-rust/issues/191)) ([6e16858](https://github.com/jrjohn/arcana-cloud-rust/commit/6e1685849c575d517be9f2a39b80caf951e2b925))
+* **deps:** update rust crate tokio to v1.54.1 ([#190](https://github.com/jrjohn/arcana-cloud-rust/issues/190)) ([55d5a1c](https://github.com/jrjohn/arcana-cloud-rust/commit/55d5a1c34c6c9b1a2223076f993852723a7cb331))
+
 ## [1.1.33](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.32...v1.1.33) (2026-10-21)
 
 
