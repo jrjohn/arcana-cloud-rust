@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.38](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.37...v1.1.38) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate tonic to v0.14.8 ([#201](https://github.com/jrjohn/arcana-cloud-rust/issues/201)) ([a8c25b2](https://github.com/jrjohn/arcana-cloud-rust/commit/a8c25b29dedfeeb8e7381f5ac5013c1a96b3840a))
+* **deps:** update rust crate tonic-build to v0.14.8 ([#202](https://github.com/jrjohn/arcana-cloud-rust/issues/202)) ([5cd4d17](https://github.com/jrjohn/arcana-cloud-rust/commit/5cd4d176c1e6b14fa62a403f5a2b62fba8998348))
+
 ## [1.1.37](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.36...v1.1.37) (2026-10-27)
 
 
