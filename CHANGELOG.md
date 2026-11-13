@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.50](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.49...v1.1.50) (2026-11-13)
+
+
+### Bug Fixes
+
+* **deps:** update tokio-prost monorepo to v0.14.6 ([#229](https://github.com/jrjohn/arcana-cloud-rust/issues/229)) ([a2578bc](https://github.com/jrjohn/arcana-cloud-rust/commit/a2578bc6d46bea7f2828f3a43866ac7143630292))
+
 ## [1.1.49](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.48...v1.1.49) (2026-11-10)
 
 
