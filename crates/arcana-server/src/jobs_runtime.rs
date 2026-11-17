@@ -20,21 +20,10 @@ use arcana_config::{AppConfig, ServerConfig};
 use arcana_core::{ArcanaError, ArcanaResult};
 use arcana_jobs::redis::{create_pool, RedisJobQueue};
 use arcana_jobs::{JobsConfig, Scheduler, WorkerPool, WorkerPoolConfig};
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::Router;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use tracing::{info, warn};
 
-/// Shared state for the operations endpoints.
-#[derive(Clone)]
-struct OpsState {
-    /// Flipped once the role has finished its startup work.
-    ready: Arc<AtomicBool>,
-    metrics: PrometheusHandle,
-}
+use crate::handler::ops::{ops_router, OpsState};
 
 /// Runs the background job worker role.
 ///
@@ -183,14 +172,7 @@ fn serve_ops(
     metrics: PrometheusHandle,
 ) -> tokio::task::JoinHandle<()> {
     let addr = server_config.rest_addr();
-    let state = OpsState { ready, metrics };
-
-    let router = Router::new()
-        .route("/health", get(health))
-        .route("/live", get(health))
-        .route("/ready", get(readiness))
-        .route("/metrics", get(render_metrics))
-        .with_state(state);
+    let router = ops_router(OpsState::new(ready, metrics));
 
     tokio::spawn(async move {
         match tokio::net::TcpListener::bind(&addr).await {
@@ -203,22 +185,6 @@ fn serve_ops(
             Err(e) => warn!("Failed to bind operations server on {addr}: {e}"),
         }
     })
-}
-
-async fn health() -> impl IntoResponse {
-    (StatusCode::OK, "ok")
-}
-
-async fn readiness(State(state): State<OpsState>) -> impl IntoResponse {
-    if state.ready.load(Ordering::SeqCst) {
-        (StatusCode::OK, "ready")
-    } else {
-        (StatusCode::SERVICE_UNAVAILABLE, "not ready")
-    }
-}
-
-async fn render_metrics(State(state): State<OpsState>) -> impl IntoResponse {
-    (StatusCode::OK, state.metrics.render())
 }
 
 /// Waits for a spawned role to finish, bounded by `timeout`.

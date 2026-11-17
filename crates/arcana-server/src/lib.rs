@@ -7,6 +7,7 @@
 
 pub mod di;
 pub mod app;
+pub mod handler;
 pub mod jobs_runtime;
 pub mod shutdown;
 pub mod startup;
