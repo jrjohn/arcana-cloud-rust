@@ -112,7 +112,10 @@ pipeline {
                 sh '''
                     set -e
                     T="arcana-rust-test-${BUILD_NUMBER}"
-                    docker rm -f "$T" 2>/dev/null || true
+                    # Remove the container AND its /app volume on any exit, even when a step above
+                    # fails under set -e (failed coverage runs left 20 GB volumes and filled /data, 2026-11-17).
+                    trap 'docker rm -fv "$T" >/dev/null 2>&1 || true' EXIT
+                    docker rm -fv "$T" 2>/dev/null || true
                     docker compose -f docker-compose.test.yml build test
                     set +e
                     docker compose -f docker-compose.test.yml run --name "$T" test
@@ -121,7 +124,7 @@ pipeline {
                     rm -f clippy-report.json
                     docker cp "$T":/app/clippy-report.json ./clippy-report.json 2>/dev/null \
                         || echo "no clippy report produced"
-                    docker rm -f "$T" 2>/dev/null || true
+                    docker rm -fv "$T" 2>/dev/null || true
                     [ -f clippy-report.json ] && echo "clippy report: $(wc -l < clippy-report.json) json lines"
                     exit $RC
                 '''
@@ -154,7 +157,10 @@ pipeline {
                 sh '''
                     set -e
                     COV="arcana-rust-coverage-${BUILD_NUMBER}"
-                    docker rm -f "$COV" 2>/dev/null || true
+                    # Remove the container AND its /app volume on any exit, even when a step above
+                    # fails under set -e (failed coverage runs left 20 GB volumes and filled /data, 2026-11-17).
+                    trap 'docker rm -fv "$COV" >/dev/null 2>&1 || true' EXIT
+                    docker rm -fv "$COV" 2>/dev/null || true
                     docker create --name "$COV" -v /app -w /app \
                         "${COVERAGE_IMAGE_TAG}:build-${BUILD_NUMBER}" \
                         sh scripts/run-coverage.sh
@@ -166,7 +172,7 @@ pipeline {
                     COV_RC=$?
                     mkdir -p coverage
                     docker cp "$COV":/app/coverage/. coverage/ 2>/dev/null || true
-                    docker rm -f "$COV" 2>/dev/null || true
+                    docker rm -fv "$COV" 2>/dev/null || true
                     docker rmi "${COVERAGE_IMAGE_TAG}:build-${BUILD_NUMBER}" 2>/dev/null || true
                     if [ -f coverage/lcov.info ]; then
                         sed -i "s|SF:/app/|SF:$(pwd)/|g" coverage/lcov.info
@@ -311,7 +317,10 @@ pipeline {
                     # Per-build container name so concurrent main/PR builds don't
                     # collide on a single static "arcana-arch-qube" name.
                     AQ="arcana-arch-qube-${BUILD_NUMBER}"
-                    docker rm -f "$AQ" 2>/dev/null || true
+                    # Remove the container AND its /app volume on any exit, even when a step above
+                    # fails under set -e (failed coverage runs left 20 GB volumes and filled /data, 2026-11-17).
+                    trap 'docker rm -fv "$AQ" >/dev/null 2>&1 || true' EXIT
+                    docker rm -fv "$AQ" 2>/dev/null || true
                     docker create --name "$AQ" --network devops_default \
                         -v /src -v /output \
                         arcana.boo/arcana/arch-qube:latest \
@@ -325,7 +334,7 @@ pipeline {
                     AQ_RC=$?
                     mkdir -p arch-qube-reports
                     docker cp "$AQ":/output/. arch-qube-reports/ 2>/dev/null || true
-                    docker rm -f "$AQ" 2>/dev/null || true
+                    docker rm -fv "$AQ" 2>/dev/null || true
                     exit $AQ_RC
                 '''
             }
