@@ -185,14 +185,9 @@ impl PasswordHasherInterface for PasswordHasher {
     }
 
     fn needs_rehash(&self, hash: &str) -> bool {
-        if let Ok(parsed) = PasswordHash::new(hash) {
-            if parsed.algorithm != argon2::Algorithm::Argon2id.ident() {
-                return true;
-            }
-            false
-        } else {
-            true
-        }
+        // An unparseable hash, or one made with another algorithm, must be re-hashed.
+        PasswordHash::new(hash)
+            .map_or(true, |parsed| parsed.algorithm != argon2::Algorithm::Argon2id.ident())
     }
 }
 
