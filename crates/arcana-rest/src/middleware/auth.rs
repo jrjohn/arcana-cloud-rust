@@ -112,7 +112,7 @@ mod tests {
             tls_key_path: None,
             password_hash_cost: 4,
         });
-        let provider = Arc::new(TokenProvider::new(config));
+        let provider = Arc::new(TokenProvider::new(config).expect("test JWT secret"));
         let state = AuthMiddlewareState::new(provider as Arc<dyn TokenProviderInterface>);
         // Verify state was created without panicking
         let _ = state.token_provider.clone();
@@ -131,7 +131,7 @@ mod tests {
             tls_key_path: None,
             password_hash_cost: 4,
         });
-        let provider = Arc::new(TokenProvider::new(config));
+        let provider = Arc::new(TokenProvider::new(config).expect("test JWT secret"));
         let state = AuthMiddlewareState::from_provider(provider);
         let _ = state.token_provider.clone();
     }
@@ -149,7 +149,7 @@ mod tests {
             tls_key_path: None,
             password_hash_cost: 4,
         });
-        let provider = Arc::new(TokenProvider::new(config));
+        let provider = Arc::new(TokenProvider::new(config).expect("test JWT secret"));
         let state = AuthMiddlewareState::new(provider as Arc<dyn TokenProviderInterface>);
         let _cloned = state.clone();
     }

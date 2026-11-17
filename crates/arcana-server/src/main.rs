@@ -228,7 +228,7 @@ async fn run_controller_layer_grpc(config: AppConfig) -> ArcanaResult<()> {
     let auth_service = arcana_grpc::create_remote_auth_service(service_url).await?;
 
     // Create token provider for JWT validation (still local)
-    let token_provider = arcana_security::TokenProvider::new(std::sync::Arc::new(config.security.clone()));
+    let token_provider = arcana_security::TokenProvider::new(std::sync::Arc::new(config.security.clone()))?;
     let token_provider: std::sync::Arc<dyn arcana_security::TokenProviderInterface> =
         std::sync::Arc::new(token_provider);
 

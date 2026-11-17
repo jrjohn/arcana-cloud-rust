@@ -291,7 +291,7 @@ mod tests {
     impl MockAuthService {
         fn new(config: Arc<SecurityConfig>) -> Self {
             Self {
-                token_provider: Arc::new(TokenProvider::new(config)),
+                token_provider: Arc::new(TokenProvider::new(config).expect("test JWT secret")),
                 users: Arc::new(Mutex::new(HashMap::new())),
             }
         }
@@ -451,7 +451,7 @@ mod tests {
     #[tokio::test]
     async fn test_health_check() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -471,7 +471,7 @@ mod tests {
     #[tokio::test]
     async fn test_readiness_check() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -488,7 +488,7 @@ mod tests {
     #[tokio::test]
     async fn test_liveness_check() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -509,7 +509,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_success() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -541,7 +541,7 @@ mod tests {
     #[tokio::test]
     async fn test_login_success() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::with_user(config, user));
@@ -570,7 +570,7 @@ mod tests {
     #[tokio::test]
     async fn test_login_invalid_credentials() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config)); // No users
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -594,7 +594,7 @@ mod tests {
     #[tokio::test]
     async fn test_refresh_token_success() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
         let user_id = user.id;
 
@@ -629,7 +629,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_me_authenticated() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
 
         let tokens = token_provider.generate_tokens(
@@ -658,7 +658,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_me_unauthenticated() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -676,7 +676,7 @@ mod tests {
     #[tokio::test]
     async fn test_logout_authenticated() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
 
         let tokens = token_provider.generate_tokens(
@@ -709,7 +709,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users_as_admin() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
         let test_user = create_test_user();
 
@@ -739,7 +739,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users_forbidden_for_regular_user() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user(); // Regular user, not admin
 
         let tokens = token_provider.generate_tokens(
@@ -764,7 +764,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_own_profile() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
         let user_id = user.id;
 
@@ -794,7 +794,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_as_admin() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
 
         let tokens = token_provider.generate_tokens(
@@ -832,7 +832,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_own_profile() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
         let user_id = user.id;
 
@@ -868,7 +868,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user_as_admin() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
         let user_to_delete = create_test_user();
         let delete_id = user_to_delete.id;
@@ -895,7 +895,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_role_as_admin() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
         let user = create_test_user();
         let user_id = user.id;
@@ -931,7 +931,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_status_as_admin() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
         let user = create_test_user();
         let user_id = user.id;
@@ -968,7 +968,7 @@ mod tests {
     #[tokio::test]
     async fn test_change_password() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
         let user_id = user.id;
 
@@ -1000,7 +1000,7 @@ mod tests {
     #[tokio::test]
     async fn test_user_not_found() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
 
         let tokens = token_provider.generate_tokens(
@@ -1026,7 +1026,7 @@ mod tests {
     #[tokio::test]
     async fn test_invalid_user_id_format() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
 
         let tokens = token_provider.generate_tokens(
@@ -1051,7 +1051,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users_with_pagination() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
 
         let tokens = token_provider.generate_tokens(
@@ -1085,7 +1085,7 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_with_valid_token() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
 
         let tokens = token_provider.generate_tokens(
@@ -1111,7 +1111,7 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_with_invalid_token() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -1131,7 +1131,7 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_without_token() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -1150,7 +1150,7 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_with_malformed_header() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -1181,7 +1181,7 @@ mod tests {
             tls_key_path: None,
             password_hash_cost: 4,
         });
-        let wrong_token_provider = Arc::new(TokenProvider::new(wrong_config.clone()));
+        let wrong_token_provider = Arc::new(TokenProvider::new(wrong_config.clone()).expect("test JWT secret"));
         let user = create_test_user();
 
         // Generate a token with the wrong secret
@@ -1191,7 +1191,7 @@ mod tests {
 
         // Use the correct config for the router
         let correct_config = create_test_security_config();
-        let correct_token_provider = Arc::new(TokenProvider::new(correct_config.clone()));
+        let correct_token_provider = Arc::new(TokenProvider::new(correct_config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(correct_config));
         let router = create_test_router(user_service, auth_service, correct_token_provider);
@@ -1211,7 +1211,7 @@ mod tests {
     #[tokio::test]
     async fn test_public_endpoints_without_auth() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -1229,7 +1229,7 @@ mod tests {
     #[tokio::test]
     async fn test_login_endpoint_without_auth() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user();
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::with_user(config, user));
@@ -1255,7 +1255,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_endpoint_without_auth() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user_service = Arc::new(MockUserService::new());
         let auth_service = Arc::new(MockAuthService::new(config));
         let router = create_test_router(user_service, auth_service, token_provider);
@@ -1283,7 +1283,7 @@ mod tests {
     #[tokio::test]
     async fn test_role_based_access_admin_only() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let user = create_test_user(); // Regular user, not admin
 
         let tokens = token_provider.generate_tokens(
@@ -1309,7 +1309,7 @@ mod tests {
     #[tokio::test]
     async fn test_role_based_access_admin_allowed() {
         let config = create_test_security_config();
-        let token_provider = Arc::new(TokenProvider::new(config.clone()));
+        let token_provider = Arc::new(TokenProvider::new(config.clone()).expect("test JWT secret"));
         let admin = create_admin_user();
 
         let tokens = token_provider.generate_tokens(

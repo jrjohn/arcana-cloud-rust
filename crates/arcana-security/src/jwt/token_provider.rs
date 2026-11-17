@@ -113,10 +113,17 @@ pub struct TokenProvider {
 
 impl TokenProvider {
     /// Creates a new token provider.
-    #[must_use]
-    pub fn new(config: Arc<SecurityConfig>) -> Self {
-        let encoding_key = EncodingKey::from_secret(config.jwt_secret.as_bytes());
-        let decoding_key = DecodingKey::from_secret(config.jwt_secret.as_bytes());
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if `jwt_secret` is empty: jsonwebtoken 12 refuses
+    /// to build an HMAC key from an empty secret, and signing with one would be worthless anyway.
+    pub fn new(config: Arc<SecurityConfig>) -> ArcanaResult<Self> {
+        let invalid = |e: jsonwebtoken::errors::Error| {
+            ArcanaError::Configuration(format!("invalid JWT secret (security.jwt_secret): {e}"))
+        };
+        let encoding_key = EncodingKey::from_secret(config.jwt_secret.as_bytes()).map_err(invalid)?;
+        let decoding_key = DecodingKey::from_secret(config.jwt_secret.as_bytes()).map_err(invalid)?;
 
         let mut validation = Validation::new(Algorithm::HS256);
         validation.set_issuer(&[&config.jwt_issuer]);
@@ -124,12 +131,12 @@ impl TokenProvider {
         validation.validate_exp = true;
         validation.validate_nbf = true;
 
-        Self {
+        Ok(Self {
             encoding_key,
             decoding_key,
             config,
             validation,
-        }
+        })
     }
 
     /// Returns the encoding key.
@@ -468,7 +475,7 @@ mod tests {
             jwt_audience: "test-audience".to_string(),
             ..Default::default()
         };
-        TokenProvider::new(Arc::new(config))
+        TokenProvider::new(Arc::new(config)).expect("test JWT secret")
     }
 
     #[test]
@@ -604,7 +611,7 @@ mod tests {
             jwt_audience: "test-audience".to_string(),
             ..Default::default()
         };
-        let provider2 = TokenProvider::new(Arc::new(config2));
+        let provider2 = TokenProvider::new(Arc::new(config2)).expect("test JWT secret");
 
         let user_id = UserId::new();
         let tokens = provider1
