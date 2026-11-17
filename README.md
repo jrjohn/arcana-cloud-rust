@@ -956,7 +956,7 @@ cargo clippy --workspace --lib --bins -- -D warnings
   #[allow(clippy::cast_precision_loss, reason = "Redis sorted-set scores are f64; ms timestamps stay exact up to 2^53")]
   ```
 - Never allow a lint for a whole module or crate, and never lower a level in `Cargo.toml` to get a build green.
-- The only module-level allows are for code we do not write: tonic-build output (`arcana-grpc/src/proto/mod.rs`) and shaku `module!` expansions (`arcana-server/src/di.rs`).
+- The only module-level allows are for code we do not write: tonic-build output (the generated modules in `arcana-proto/src/lib.rs`) and shaku `module!` expansions (`arcana-server/src/di.rs`).
 
 **What the pedantic lints ask for**
 

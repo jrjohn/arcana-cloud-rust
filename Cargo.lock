@@ -147,7 +147,7 @@ dependencies = [
  "arcana-config",
  "arcana-core",
  "arcana-jobs",
- "arcana-repository",
+ "arcana-proto",
  "arcana-security",
  "arcana-service",
  "async-trait",
@@ -162,7 +162,6 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tonic-prost",
- "tonic-prost-build",
  "tracing",
  "uuid",
 ]
@@ -213,11 +212,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "arcana-proto"
+version = "0.1.0"
+dependencies = [
+ "arcana-config",
+ "arcana-core",
+ "prost",
+ "prost-types",
+ "tempfile",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+]
+
+[[package]]
 name = "arcana-repository"
 version = "0.1.0"
 dependencies = [
  "arcana-config",
  "arcana-core",
+ "arcana-proto",
  "async-trait",
  "chrono",
  "serde",
@@ -226,6 +241,7 @@ dependencies = [
  "sqlx",
  "testcontainers",
  "tokio",
+ "tonic",
  "tracing",
  "uuid",
 ]

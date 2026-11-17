@@ -1,0 +1,26 @@
+[package]
+name = "arcana-proto"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Protobuf definitions and gRPC transport helpers (TLS) for Arcana Cloud Rust"
+build = "build.rs"
+
+[dependencies]
+arcana-core.workspace = true
+arcana-config.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+tracing.workspace = true
+
+[build-dependencies]
+tonic-prost-build.workspace = true
+
+[dev-dependencies]
+tempfile = "3.14"
+
+[lints]
+workspace = true

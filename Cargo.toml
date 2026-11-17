@@ -5,6 +5,7 @@ members = [
     "crates/arcana-repository",
     "crates/arcana-service",
     "crates/arcana-rest",
+    "crates/arcana-proto",
     "crates/arcana-grpc",
     "crates/arcana-security",
     "crates/arcana-config",
@@ -127,6 +128,7 @@ arcana-core = { path = "crates/arcana-core" }
 arcana-repository = { path = "crates/arcana-repository" }
 arcana-service = { path = "crates/arcana-service" }
 arcana-rest = { path = "crates/arcana-rest" }
+arcana-proto = { path = "crates/arcana-proto" }
 arcana-grpc = { path = "crates/arcana-grpc" }
 arcana-security = { path = "crates/arcana-security" }
 arcana-config = { path = "crates/arcana-config" }
