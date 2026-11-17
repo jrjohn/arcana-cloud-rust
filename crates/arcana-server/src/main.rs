@@ -325,14 +325,15 @@ async fn run_repository_layer(config: AppConfig) -> ArcanaResult<()> {
     let user_repository = RepositoryResolver::user_repository(module.as_ref());
 
     // Create gRPC server to expose repository
-    let grpc_server = arcana_grpc::RepositoryGrpcServer::new(&config.server, user_repository)?;
+    let grpc_server =
+        arcana_repository::remote::RepositoryGrpcServer::new(&config.server, user_repository)?;
 
     info!(
         "Starting Repository gRPC server on {}",
         config.server.grpc_addr()
     );
 
-    grpc_server.serve().await?;
+    grpc_server.serve(arcana_grpc::HealthServiceImpl::new()).await?;
 
     info!("Repository layer shutdown complete");
     Ok(())

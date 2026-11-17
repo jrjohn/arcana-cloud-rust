@@ -1,6 +1,6 @@
 //! gRPC health service implementation.
 
-use crate::proto::health::{
+use arcana_proto::health::{
     health_check_response::ServingStatus,
     health_server::Health,
     HealthCheckRequest, HealthCheckResponse,

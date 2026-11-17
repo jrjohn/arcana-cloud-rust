@@ -8,19 +8,22 @@
 pub mod clients;
 pub mod di;
 pub mod interceptors;
-pub mod proto;
 pub mod server;
 pub mod services;
-pub mod tls;
 
 pub use clients::*;
 pub use server::*;
 pub use services::*;
-pub use tls::{TlsConfigBuilder, build_client_tls_from_ca, build_client_tls_from_config};
+pub use arcana_proto::{TlsConfigBuilder, build_client_tls_from_ca, build_client_tls_from_config};
+
+/// Generated protobuf code, re-exported from [`arcana_proto`] for existing callers.
+pub use arcana_proto as proto;
+/// gRPC TLS helpers, re-exported from [`arcana_proto`] for existing callers.
+pub use arcana_proto::tls;
 
 #[cfg(test)]
 mod tests {
-    use super::proto::{auth, common, user};
+    use arcana_proto::{auth, common, user};
     use super::services::{AuthGrpcService, UserGrpcService};
     use arcana_config::SecurityConfig;
     use arcana_core::{ArcanaError, ArcanaResult, Page, PageRequest, UserId};

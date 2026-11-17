@@ -1,6 +1,6 @@
 //! Remote auth service client via gRPC.
 
-use crate::proto::{auth, user as user_proto};
+use arcana_proto::{auth, user as user_proto};
 use arcana_core::{ArcanaError, ArcanaResult, UserId};
 use arcana_security::Claims;
 use arcana_service::dto::{

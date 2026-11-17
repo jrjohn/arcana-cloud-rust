@@ -1,6 +1,6 @@
 //! Remote user service client via gRPC.
 
-use crate::proto::{common, user};
+use arcana_proto::{common, user};
 use arcana_core::{ArcanaError, ArcanaResult, PageRequest, UserId};
 use arcana_service::dto::{
     ChangePasswordRequest, CreateUserRequest, UpdateUserRequest, UpdateUserRoleRequest,

@@ -1,6 +1,6 @@
 //! Authentication gRPC service implementation.
 
-use crate::proto::{auth, common, user as user_proto};
+use arcana_proto::{auth, common, user as user_proto};
 use arcana_service::dto::{LoginRequest, RefreshTokenRequest, RegisterRequest};
 use arcana_service::AuthService;
 use std::sync::Arc;

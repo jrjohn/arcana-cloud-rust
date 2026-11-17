@@ -5,13 +5,12 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "gRPC service layer using Tonic for Arcana Cloud Rust"
-build = "build.rs"
 
 [dependencies]
 arcana-core.workspace = true
+arcana-proto.workspace = true
 arcana-config.workspace = true
 arcana-jobs.workspace = true
-arcana-repository.workspace = true
 arcana-security.workspace = true
 arcana-service.workspace = true
 tonic.workspace = true
@@ -27,9 +26,6 @@ tokio-stream = "0.1"
 async-trait.workspace = true
 reqwest = { version = "0.13", features = ["json", "query"] }
 shaku.workspace = true
-
-[build-dependencies]
-tonic-prost-build.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

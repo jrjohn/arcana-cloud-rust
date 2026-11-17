@@ -3,7 +3,7 @@
 //! This is the only place in the crate that names the concrete `*Impl`
 //! service types; server builders receive ready-to-mount tonic servers.
 
-use crate::proto::{health, jobs};
+use arcana_proto::{health, jobs};
 use crate::services::{HealthServiceImpl, JobQueueServiceImpl, WorkerServiceImpl};
 
 /// Builds the gRPC health service.

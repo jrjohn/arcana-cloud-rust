@@ -1,6 +1,6 @@
 //! User gRPC service implementation.
 
-use crate::proto::{common, user};
+use arcana_proto::{common, user};
 use arcana_core::{PageRequest, UserId};
 use arcana_service::dto::{CreateUserRequest, UpdateUserRequest, UpdateUserRoleRequest, UpdateUserStatusRequest};
 use arcana_service::UserService;

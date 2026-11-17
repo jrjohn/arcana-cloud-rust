@@ -1,11 +1,11 @@
 //! Remote repository client via gRPC.
 
-use crate::proto::{common, repository, user as user_proto};
-use crate::tls::build_client_tls_from_config;
+use arcana_proto::{common, repository, user as user_proto};
+use arcana_proto::build_client_tls_from_config;
 use arcana_config::SecurityConfig;
 use arcana_core::{ArcanaError, ArcanaResult, Page, PageRequest, UserId};
 use arcana_core::{Email, User, UserRole, UserStatus};
-use arcana_repository::UserRepository;
+use crate::UserRepository;
 use async_trait::async_trait;
 use shaku::Component;
 use std::sync::Arc;

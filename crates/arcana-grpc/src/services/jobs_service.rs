@@ -1,6 +1,6 @@
 //! gRPC Job Queue Service implementation.
 
-use crate::proto::jobs::v1::{
+use arcana_proto::jobs::v1::{
     job_queue_service_server::JobQueueService,
     worker_service_server::WorkerService,
     CancelJobRequest, CancelJobResponse, CompleteRequest, CompleteResponse,

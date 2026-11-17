@@ -9,6 +9,8 @@ description = "Repository implementations for Arcana Cloud Rust using SQLx"
 [dependencies]
 arcana-core.workspace = true
 arcana-config.workspace = true
+arcana-proto.workspace = true
+tonic.workspace = true
 sqlx.workspace = true
 async-trait.workspace = true
 serde = { workspace = true }
