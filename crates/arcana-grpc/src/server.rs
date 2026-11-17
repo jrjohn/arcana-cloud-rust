@@ -1,10 +1,8 @@
 //! gRPC server setup.
 
-use crate::proto::{auth, health, jobs, repository, user};
-use crate::services::{
-    AuthGrpcService, HealthServiceImpl, JobQueueServiceImpl, RepositoryGrpcService,
-    UserGrpcService, WorkerServiceImpl,
-};
+use crate::di::{health_server, job_queue_server, worker_server};
+use crate::proto::{auth, repository, user};
+use crate::services::{AuthGrpcService, RepositoryGrpcService, UserGrpcService};
 use crate::tls::TlsConfigBuilder;
 use arcana_config::{SecurityConfig, ServerConfig};
 use arcana_core::ArcanaResult;
@@ -86,11 +84,8 @@ impl GrpcServer {
         info!("Starting gRPC server on {} {}", self.addr, tls_status);
 
         // Create service implementations
-        let health_service = HealthServiceImpl::new();
         let user_grpc_service = UserGrpcService::new(self.user_service);
         let auth_grpc_service = AuthGrpcService::new(self.auth_service);
-        let job_queue_service = JobQueueServiceImpl::new();
-        let worker_service = WorkerServiceImpl::new();
 
         let mut builder = Server::builder();
 
@@ -102,11 +97,11 @@ impl GrpcServer {
         }
 
         builder
-            .add_service(health::health_server::HealthServer::new(health_service))
+            .add_service(health_server())
             .add_service(user::user_service_server::UserServiceServer::new(user_grpc_service))
             .add_service(auth::auth_service_server::AuthServiceServer::new(auth_grpc_service))
-            .add_service(jobs::v1::job_queue_service_server::JobQueueServiceServer::new(job_queue_service))
-            .add_service(jobs::v1::worker_service_server::WorkerServiceServer::new(worker_service))
+            .add_service(job_queue_server())
+            .add_service(worker_server())
             .serve(self.addr)
             .await
             .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {e}")))?;
@@ -180,7 +175,6 @@ impl RepositoryGrpcServer {
         let tls_status = if self.tls_config.is_some() { "with TLS" } else { "without TLS" };
         info!("Starting Repository gRPC server on {} {}", self.addr, tls_status);
 
-        let health_service = HealthServiceImpl::new();
         let repository_service = RepositoryGrpcService::new(self.user_repository);
 
         let mut builder = Server::builder();
@@ -193,7 +187,7 @@ impl RepositoryGrpcServer {
         }
 
         builder
-            .add_service(health::health_server::HealthServer::new(health_service))
+            .add_service(health_server())
             .add_service(
                 repository::repository_service_server::RepositoryServiceServer::new(
                     repository_service,
@@ -234,10 +228,8 @@ impl SimpleGrpcServer {
     pub async fn serve(self) -> ArcanaResult<()> {
         info!("Starting gRPC server on {}", self.addr);
 
-        let health_service = HealthServiceImpl::new();
-
         Server::builder()
-            .add_service(health::health_server::HealthServer::new(health_service))
+            .add_service(health_server())
             .serve(self.addr)
             .await
             .map_err(|e| arcana_core::ArcanaError::Internal(format!("gRPC server error: {e}")))?;

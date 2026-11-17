@@ -6,6 +6,7 @@
 //! Also includes gRPC clients for inter-layer communication in distributed deployments.
 
 pub mod clients;
+pub mod di;
 pub mod interceptors;
 pub mod proto;
 pub mod server;
