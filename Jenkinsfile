@@ -386,11 +386,12 @@ pipeline {
           always  {
               echo "Build number ${BUILD_NUMBER} done"
               script {
-                  if (env.CHANGE_ID) {
-                      // PR builds: drop the compose-built images named after this workspace
-                      // (<job>_pr-N-<service>:latest, 4.5-6 GB each). Nothing reuses them once the
-                      // PR build is over; left behind they filled /data to 96% (2026-11-18).
-                      // main keeps its own so the next main build reuses the layers.
+                  if (env.BRANCH_NAME != 'main') {
+                      // Every non-main build (PRs AND plain branch builds): drop the compose-built
+                      // images named after this workspace (<workspace>-<service>:latest, 4.5-6 GB
+                      // each). Nothing reuses them afterwards; left behind they filled /data to
+                      // 96% then 98% (2026-11-18, the second time from branch builds, which have no
+                      // CHANGE_ID). main keeps its own so the next main build reuses the layers.
                       sh '''
                           P=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
                           docker images --format '{{.Repository}}:{{.Tag}}' \
