@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.55](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.54...v1.1.55) (2026-11-18)
+
+
+### Bug Fixes
+
+* **ci:** 暫存容器 trap EXIT 清理並刪除 volume ([#237](https://github.com/jrjohn/arcana-cloud-rust/issues/237)) ([df552cd](https://github.com/jrjohn/arcana-cloud-rust/commit/df552cd0659815fb6f3e0926465591fca52df80e))
+
 ## [1.1.54](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.53...v1.1.54) (2026-11-17)
 
 
