@@ -383,7 +383,23 @@ pipeline {
               '''
           }
           failure { echo "Pipeline FAILED - branch=${env.BRANCH_NAME ?: '?'} pr=${env.CHANGE_ID ?: 'no'}" }
-          always  { echo "Build number ${BUILD_NUMBER} done" }
+          always  {
+              echo "Build number ${BUILD_NUMBER} done"
+              script {
+                  if (env.CHANGE_ID) {
+                      // PR builds: drop the compose-built images named after this workspace
+                      // (<job>_pr-N-<service>:latest, 4.5-6 GB each). Nothing reuses them once the
+                      // PR build is over; left behind they filled /data to 96% (2026-11-18).
+                      // main keeps its own so the next main build reuses the layers.
+                      sh '''
+                          P=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
+                          docker images --format '{{.Repository}}:{{.Tag}}' \
+                              | grep -E "^${P}-[a-z0-9_-]+:" \
+                              | xargs -r docker rmi 2>/dev/null || true
+                      '''
+                  }
+              }
+          }
       }
       }
     }
