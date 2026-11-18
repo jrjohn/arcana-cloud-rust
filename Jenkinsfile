@@ -393,7 +393,9 @@ pipeline {
                       // 96% then 98% (2026-11-18, the second time from branch builds, which have no
                       // CHANGE_ID). main keeps its own so the next main build reuses the layers.
                       sh '''
-                          P=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
+                          # compose names the project after the dir: lowercased, leading non-alnum dropped
+                          # (long branch names give Jenkins dirs like "_pipeline-mb_ci_x").
+                          P=$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | sed 's/^[^a-z0-9]*//')
                           docker images --format '{{.Repository}}:{{.Tag}}' \
                               | grep -E "^${P}-[a-z0-9_-]+:" \
                               | xargs -r docker rmi 2>/dev/null || true
