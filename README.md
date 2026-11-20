@@ -5,7 +5,7 @@
 [![Tokio](https://img.shields.io/badge/Tokio-1.52-blue)](https://tokio.rs/)
 [![Axum](https://img.shields.io/badge/Axum-0.8-blue)](https://github.com/tokio-rs/axum)
 [![Tonic](https://img.shields.io/badge/Tonic-0.14-blue)](https://github.com/hyperium/tonic)
-[![Wasmtime](https://img.shields.io/badge/Wasmtime-50-purple)](https://wasmtime.dev/)
+[![Wasmtime](https://img.shields.io/badge/Wasmtime-51-purple)](https://wasmtime.dev/)
 [![Tests](https://img.shields.io/badge/Tests-694%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -1208,7 +1208,7 @@ open tarpaulin-report.html
 | **REST Framework** | Axum | 0.8 |
 | **gRPC Framework** | Tonic | 0.14 |
 | **Database** | SQLx | 0.9 |
-| **WASM Runtime** | Wasmtime | 50 |
+| **WASM Runtime** | Wasmtime | 51 |
 | **JWT** | jsonwebtoken | 11.0 |
 | **Password Hashing** | Argon2 | 0.6 |
 | **Rate Limiting** | Governor | 0.10 |
