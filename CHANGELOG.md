@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.58](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.57...v1.1.58) (2026-11-20)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate wasmtime to v51 ([#248](https://github.com/jrjohn/arcana-cloud-rust/issues/248)) ([aef10e7](https://github.com/jrjohn/arcana-cloud-rust/commit/aef10e71a5964ab128f4432cf68566d7cd8c5783))
+
 ## [1.1.57](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.56...v1.1.57) (2026-11-19)
 
 
