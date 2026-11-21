@@ -75,7 +75,7 @@ uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
 
 # WASM Plugin Runtime
 wasmtime = { version = "51", features = ["component-model"] }
-wasmtime-wasi = "50"
+wasmtime-wasi = "51"
 
 # Resilience
 governor = "0.10"
