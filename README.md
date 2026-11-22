@@ -5,7 +5,7 @@
 [![Tokio](https://img.shields.io/badge/Tokio-1.52-blue)](https://tokio.rs/)
 [![Axum](https://img.shields.io/badge/Axum-0.8-blue)](https://github.com/tokio-rs/axum)
 [![Tonic](https://img.shields.io/badge/Tonic-0.14-blue)](https://github.com/hyperium/tonic)
-[![Wasmtime](https://img.shields.io/badge/Wasmtime-50-purple)](https://wasmtime.dev/)
+[![Wasmtime](https://img.shields.io/badge/Wasmtime-51-purple)](https://wasmtime.dev/)
 [![Tests](https://img.shields.io/badge/Tests-694%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -956,7 +956,7 @@ cargo clippy --workspace --lib --bins -- -D warnings
   #[allow(clippy::cast_precision_loss, reason = "Redis sorted-set scores are f64; ms timestamps stay exact up to 2^53")]
   ```
 - Never allow a lint for a whole module or crate, and never lower a level in `Cargo.toml` to get a build green.
-- The only module-level allows are for code we do not write: tonic-build output (`arcana-grpc/src/proto/mod.rs`) and shaku `module!` expansions (`arcana-server/src/di.rs`).
+- The only module-level allows are for code we do not write: tonic-build output (the generated modules in `arcana-proto/src/lib.rs`) and shaku `module!` expansions (`arcana-server/src/di.rs`).
 
 **What the pedantic lints ask for**
 
@@ -1208,7 +1208,7 @@ open tarpaulin-report.html
 | **REST Framework** | Axum | 0.8 |
 | **gRPC Framework** | Tonic | 0.14 |
 | **Database** | SQLx | 0.9 |
-| **WASM Runtime** | Wasmtime | 50 |
+| **WASM Runtime** | Wasmtime | 51 |
 | **JWT** | jsonwebtoken | 11.0 |
 | **Password Hashing** | Argon2 | 0.6 |
 | **Rate Limiting** | Governor | 0.10 |

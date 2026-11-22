@@ -7,7 +7,7 @@
 
 use arcana_config::{DatabaseConfig, RedisConfig, SecurityConfig, SecurityConfigInterface};
 use arcana_core::{module, ArcanaResult, HasComponent};
-use arcana_grpc::RemoteUserRepository;
+use arcana_repository::remote::RemoteUserRepository;
 use arcana_repository::{
     DatabasePool, DatabasePoolInterface,
     MySqlUserDaoImpl,
@@ -236,7 +236,7 @@ pub async fn build_distributed_service_module(
             password_hash_cost: security_config.password_hash_cost,
         })
         .with_component_parameters::<RemoteUserRepository>(
-            arcana_grpc::RemoteUserRepositoryParameters {
+            arcana_repository::remote::RemoteUserRepositoryParameters {
                 client: remote_repo.client().clone(),
             },
         )

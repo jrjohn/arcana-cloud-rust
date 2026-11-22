@@ -36,6 +36,7 @@ pub mod pool;
 pub mod mysql;
 pub mod traits;
 pub mod r#impl;
+pub mod remote;
 mod sql_convert;
 
 pub use dao::UserDao;

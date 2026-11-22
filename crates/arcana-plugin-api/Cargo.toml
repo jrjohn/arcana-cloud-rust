@@ -8,9 +8,6 @@ description = "Plugin API for Arcana Cloud Rust - WASM plugin interface definiti
 
 [dependencies]
 serde = { workspace = true }
-serde_json.workspace = true
-chrono.workspace = true
-uuid.workspace = true
 
 [features]
 default = ["host"]

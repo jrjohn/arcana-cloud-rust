@@ -11,7 +11,6 @@ arcana-core.workspace = true
 arcana-config.workspace = true
 arcana-plugin-api = { workspace = true, features = ["host"] }
 wasmtime.workspace = true
-wasmtime-wasi.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true
 serde = { workspace = true }

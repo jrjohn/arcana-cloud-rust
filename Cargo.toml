@@ -5,6 +5,7 @@ members = [
     "crates/arcana-repository",
     "crates/arcana-service",
     "crates/arcana-rest",
+    "crates/arcana-proto",
     "crates/arcana-grpc",
     "crates/arcana-security",
     "crates/arcana-config",
@@ -73,8 +74,8 @@ argon2 = "0.6"
 uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
 
 # WASM Plugin Runtime
-wasmtime = { version = "50", features = ["component-model"] }
-wasmtime-wasi = "50"
+wasmtime = { version = "51", features = ["component-model"] }
+wasmtime-wasi = "51"
 
 # Resilience
 governor = "0.10"
@@ -127,6 +128,7 @@ arcana-core = { path = "crates/arcana-core" }
 arcana-repository = { path = "crates/arcana-repository" }
 arcana-service = { path = "crates/arcana-service" }
 arcana-rest = { path = "crates/arcana-rest" }
+arcana-proto = { path = "crates/arcana-proto" }
 arcana-grpc = { path = "crates/arcana-grpc" }
 arcana-security = { path = "crates/arcana-security" }
 arcana-config = { path = "crates/arcana-config" }

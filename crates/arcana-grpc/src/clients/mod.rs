@@ -12,10 +12,8 @@
 
 mod user_client;
 mod auth_client;
-mod repository_client;
 mod http_user_client;
 
 pub use user_client::*;
 pub use auth_client::*;
-pub use repository_client::*;
 pub use http_user_client::*;

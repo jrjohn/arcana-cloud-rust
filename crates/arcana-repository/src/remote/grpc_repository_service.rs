@@ -2,10 +2,10 @@
 //!
 //! This service exposes the repository layer via gRPC for distributed deployments.
 
-use crate::proto::{common, repository, user as user_proto};
+use arcana_proto::{common, repository, user as user_proto};
 use arcana_core::{Page, PageRequest, UserId};
 use arcana_core::{Email, User, UserRole, UserStatus};
-use arcana_repository::UserRepository;
+use crate::UserRepository;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{debug, error};

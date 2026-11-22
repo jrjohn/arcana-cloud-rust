@@ -1,5 +1,68 @@
 # Changelog
 
+## [1.1.60](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.59...v1.1.60) (2026-11-21)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate toml to v1.2.2 ([#252](https://github.com/jrjohn/arcana-cloud-rust/issues/252)) ([923f673](https://github.com/jrjohn/arcana-cloud-rust/commit/923f6738adb508e5bb910e81da977ea770ec69b6))
+
+## [1.1.59](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.58...v1.1.59) (2026-11-21)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate wasmtime-wasi to v51 ([#250](https://github.com/jrjohn/arcana-cloud-rust/issues/250)) ([87d42c1](https://github.com/jrjohn/arcana-cloud-rust/commit/87d42c1e692fbda7e1b9c5746ec45c455b168122))
+
+## [1.1.58](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.57...v1.1.58) (2026-11-20)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate wasmtime to v51 ([#248](https://github.com/jrjohn/arcana-cloud-rust/issues/248)) ([aef10e7](https://github.com/jrjohn/arcana-cloud-rust/commit/aef10e71a5964ab128f4432cf68566d7cd8c5783))
+
+## [1.1.57](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.56...v1.1.57) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate wasmtime to v50.0.3 ([#246](https://github.com/jrjohn/arcana-cloud-rust/issues/246)) ([d3ea97d](https://github.com/jrjohn/arcana-cloud-rust/commit/d3ea97dea6f7db6e852bc1e8e9ad2f05722546e5))
+
+## [1.1.56](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.55...v1.1.56) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate wasmtime to v50.0.2 ([#244](https://github.com/jrjohn/arcana-cloud-rust/issues/244)) ([6453616](https://github.com/jrjohn/arcana-cloud-rust/commit/6453616ce486ef391b76fa30a032a5692a7c534e))
+
+## [1.1.55](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.54...v1.1.55) (2026-11-18)
+
+
+### Bug Fixes
+
+* **ci:** 暫存容器 trap EXIT 清理並刪除 volume ([#237](https://github.com/jrjohn/arcana-cloud-rust/issues/237)) ([df552cd](https://github.com/jrjohn/arcana-cloud-rust/commit/df552cd0659815fb6f3e0926465591fca52df80e))
+
+## [1.1.54](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.53...v1.1.54) (2026-11-17)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate uuid to v1.29.3 ([#240](https://github.com/jrjohn/arcana-cloud-rust/issues/240)) ([f33d259](https://github.com/jrjohn/arcana-cloud-rust/commit/f33d259ff6efb3d46a6296123d19bb976b4dc6c5))
+
+## [1.1.53](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.52...v1.1.53) (2026-11-17)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate redis to v1.8.2 ([#238](https://github.com/jrjohn/arcana-cloud-rust/issues/238)) ([438832c](https://github.com/jrjohn/arcana-cloud-rust/commit/438832cc238ae69a036712ac714e079b4ccb4f66))
+
+## [1.1.52](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.51...v1.1.52) (2026-11-17)
+
+
+### Bug Fixes
+
+* **deps:** update rust docker tag to v1.100.0 ([#230](https://github.com/jrjohn/arcana-cloud-rust/issues/230)) ([e40c3dc](https://github.com/jrjohn/arcana-cloud-rust/commit/e40c3dc8534e927ca7536b22a6cbc2a00fedcb03))
+
 ## [1.1.51](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.50...v1.1.51) (2026-11-13)
 
 
