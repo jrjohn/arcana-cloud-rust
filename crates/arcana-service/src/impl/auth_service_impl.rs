@@ -23,17 +23,21 @@ pub struct AuthServiceImpl<R: UserRepository> {
 
 impl<R: UserRepository> AuthServiceImpl<R> {
     /// Creates a new authentication service.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ArcanaError::Configuration`] if the JWT secret is empty (see [`TokenProvider::new`]).
     pub fn new(
         user_repository: Arc<R>,
         password_hasher: Arc<PasswordHasher>,
         security_config: Arc<SecurityConfig>,
-    ) -> Self {
-        let token_provider = Arc::new(TokenProvider::new(security_config));
-        Self {
+    ) -> ArcanaResult<Self> {
+        let token_provider = Arc::new(TokenProvider::new(security_config)?);
+        Ok(Self {
             user_repository,
             password_hasher,
             token_provider,
-        }
+        })
     }
 
     /// Creates an auth response for a user.
@@ -551,7 +555,7 @@ mod tests {
             Arc::new(repo),
             Arc::new(PasswordHasher::new()),
             create_test_config(),
-        )
+        ).expect("test JWT secret")
     }
 
     #[tokio::test]

@@ -138,7 +138,7 @@ pub async fn build_monolithic_module(
     let password_hasher = PasswordHasher::with_cost(security_config.password_hash_cost());
 
     // Create token provider with security config
-    let token_provider = TokenProvider::new(Arc::new(security_config.clone()));
+    let token_provider = TokenProvider::new(Arc::new(security_config.clone()))?;
 
     // Build the module with parameters
     let module = MonolithicModule::builder()
@@ -207,7 +207,7 @@ pub async fn build_distributed_service_module(
     let password_hasher = PasswordHasher::with_cost(security_config.password_hash_cost());
 
     // Create token provider with security config
-    let token_provider = TokenProvider::new(Arc::new(security_config.clone()));
+    let token_provider = TokenProvider::new(Arc::new(security_config.clone()))?;
 
     // Build the module with parameters
     let module = DistributedServiceModule::builder()
@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn test_token_provider_component() {
         let config = Arc::new(create_test_security_config());
-        let token_provider = TokenProvider::new(config);
+        let token_provider = TokenProvider::new(config).expect("test JWT secret");
 
         let user_id = arcana_core::UserId::new();
         let username = "testuser";
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn test_token_provider_validation() {
         let config = Arc::new(create_test_security_config());
-        let token_provider = TokenProvider::new(config);
+        let token_provider = TokenProvider::new(config).expect("test JWT secret");
 
         let user_id = arcana_core::UserId::new();
         let username = "testuser";
@@ -591,7 +591,7 @@ mod tests {
     #[test]
     fn test_token_provider_refresh() {
         let config = Arc::new(create_test_security_config());
-        let token_provider = TokenProvider::new(config);
+        let token_provider = TokenProvider::new(config).expect("test JWT secret");
 
         let user_id = arcana_core::UserId::new();
         let tokens = token_provider.generate_tokens(user_id, "user", "user@test.com", UserRole::User).unwrap();
@@ -608,7 +608,7 @@ mod tests {
     #[test]
     fn test_token_provider_invalid_token() {
         let config = Arc::new(create_test_security_config());
-        let token_provider = TokenProvider::new(config);
+        let token_provider = TokenProvider::new(config).expect("test JWT secret");
 
         // Invalid token should fail validation
         let result = token_provider.validate_access_token("invalid.token.here");
@@ -626,8 +626,8 @@ mod tests {
             ..create_test_security_config()
         });
 
-        let provider1 = TokenProvider::new(config1);
-        let provider2 = TokenProvider::new(config2);
+        let provider1 = TokenProvider::new(config1).expect("test JWT secret");
+        let provider2 = TokenProvider::new(config2).expect("test JWT secret");
 
         let user_id = arcana_core::UserId::new();
         let tokens = provider1.generate_tokens(user_id, "user", "user@test.com", UserRole::User).unwrap();
@@ -692,7 +692,7 @@ mod tests {
     #[test]
     fn test_token_provider_parameters() {
         let config = Arc::new(create_test_security_config());
-        let provider = TokenProvider::new(config.clone());
+        let provider = TokenProvider::new(config.clone()).expect("test JWT secret");
 
         // Verify parameters can be created
         let params = arcana_security::TokenProviderParameters {

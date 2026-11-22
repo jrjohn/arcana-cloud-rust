@@ -170,7 +170,7 @@ mod tests {
     impl MockAuthService {
         fn new(config: Arc<SecurityConfig>) -> Self {
             Self {
-                token_provider: Arc::new(TokenProvider::new(config)),
+                token_provider: Arc::new(TokenProvider::new(config).expect("test JWT secret")),
                 users: Arc::new(Mutex::new(HashMap::new())),
             }
         }
@@ -541,7 +541,7 @@ mod tests {
     #[tokio::test]
     async fn test_grpc_refresh_token_success() {
         let config = create_test_security_config();
-        let token_provider = TokenProvider::new(config.clone());
+        let token_provider = TokenProvider::new(config.clone()).expect("test JWT secret");
         let user = create_test_user();
 
         // Generate a refresh token
@@ -565,7 +565,7 @@ mod tests {
     #[tokio::test]
     async fn test_grpc_validate_token_success() {
         let config = create_test_security_config();
-        let token_provider = TokenProvider::new(config.clone());
+        let token_provider = TokenProvider::new(config.clone()).expect("test JWT secret");
         let user = create_test_user();
 
         let tokens = token_provider.generate_tokens(
