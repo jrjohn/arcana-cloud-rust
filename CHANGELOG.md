@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.61](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.60...v1.1.61) (2026-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate jsonwebtoken to v12 ([#234](https://github.com/jrjohn/arcana-cloud-rust/issues/234)) ([eeed073](https://github.com/jrjohn/arcana-cloud-rust/commit/eeed0732ec58fc472766224f715367248cfd06dd))
+
 ## [1.1.60](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.59...v1.1.60) (2026-11-21)
 
 
