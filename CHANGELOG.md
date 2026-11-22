@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.62](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.61...v1.1.62) (2026-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate url to v2.5.9 ([#255](https://github.com/jrjohn/arcana-cloud-rust/issues/255)) ([0e6ab75](https://github.com/jrjohn/arcana-cloud-rust/commit/0e6ab758b39cbc88be821f89dbd77ad154ca68ee))
+
 ## [1.1.61](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.60...v1.1.61) (2026-11-22)
 
 
