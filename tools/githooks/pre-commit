@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Fast layering check on every commit (no docker, no cargo). The full scan is
+# tools/arch-check.sh and the Jenkins stage "Architecture Qube". Rules: AGENTS.md §3.
+#
+# Regex, not `case` globs: in a case pattern `*` also matches `/`, so `crates/*/src/*.rs`
+# would match every correctly layered file too (this exact bug false-blocked good files in
+# arcana-embedded-esp32's first version of this hook).
+set -euo pipefail
+
+fail=0
+
+# R1 — no NEW .rs file directly under a crate's src/ root. Allowed there: lib.rs, main.rs,
+# and the service-trait convention <x>_service.rs in the *-service crate.
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if [[ "$f" =~ ^(crates|plugins)/[^/]+/src/[^/]+\.rs$ ]]; then
+        base="${f##*/}"
+        if [[ "$base" =~ ^(lib|main)\.rs$ ]]; then continue; fi
+        if [[ "$f" =~ ^crates/[^/]+-service/src/[a-z0-9_]+_service\.rs$ ]]; then continue; fi
+        echo "pre-commit: $f — new source file at the crate root. Put it in a layer directory (AGENTS.md §2) or run tools/new-feature.sh" >&2
+        fail=1
+    fi
+done <<< "$(git diff --cached --name-only --diff-filter=AR)"
+
+# R2 — a concrete *Impl type is named only by the DI container (crates/*-server/src/di.rs,
+# crates/*-grpc/src/di.rs), by impl code itself (files under an impl/ directory or named
+# *_impl.rs) and by `pub use` re-exports in lib.rs / mod.rs. Only ADDED lines are checked, so
+# editing a legacy file does not fail on old code.
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [[ "$f" =~ \.rs$ ]] || continue
+    if [[ "$f" =~ (^|/)di\.rs$ ]] || [[ "$f" =~ /impl/ ]] || [[ "$f" =~ _impl\.rs$ ]] || [[ "$f" =~ ^(crates|plugins)/[^/]+/tests/ ]]; then
+        continue
+    fi
+    reexport_ok=0
+    [[ "$f" =~ (^|/)(lib|mod)\.rs$ ]] && reexport_ok=1
+    hits="$(git diff --cached -U0 -- "$f" | grep -E '^\+[^+]' | sed 's/^+//' \
+        | grep -E '\b[A-Z][A-Za-z0-9]*Impl\b' | grep -vE '^\s*//' || true)"
+    [ -n "$hits" ] || continue
+    if [ "$reexport_ok" -eq 1 ]; then
+        hits="$(printf '%s\n' "$hits" | grep -vE '^\s*pub use ' || true)"
+        [ -n "$hits" ] || continue
+    fi
+    echo "pre-commit: $f names a concrete *Impl type — depend on the trait (Arc<dyn X>) and let di.rs wire it (AGENTS.md R2):" >&2
+    printf '    %s\n' "$hits" >&2
+    fail=1
+done <<< "$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [ "$fail" -ne 0 ]; then
+    echo "pre-commit: blocked. Full check: tools/arch-check.sh" >&2
+    exit 1
+fi
