@@ -5,7 +5,7 @@ in this repository **or in any product created from it**. `CLAUDE.md`, `GEMINI.m
 `.github/copilot-instructions.md` all point here; this file is the single source.
 
 > **You MUST NOT report a task as done until `tools/arch-check.sh` exits 0 and the CI test
-> lane (§4) is green.** Breaking the layering costs a red build: the pre-commit hook
+> lane (§5) is green.** Breaking the layering costs a red build: the pre-commit hook
 > (`tools/githooks/pre-commit`) rejects new flat files and `*Impl` references outside the DI
 > container, and Jenkins stage "Architecture Qube" fails the merge below score 90.
 
@@ -61,12 +61,42 @@ uses a higher one. Worked example of every layer: the User feature —
 | R9 | SQL is a string literal with `?` binds (SQLx rejects `format!` SQL at compile time). Schema changes are a new file in `migrations/`, never an edit of an applied one. | the compiler; migrations (on you) |
 | R10 | The Rust version comes from `rust-toolchain.toml`; the Dockerfiles use the same tag. Change both in one PR. | CI images (on you) |
 
-## 4. Before you say "done"
+## 4. Architecture check (arch-qube)
+
+arch-qube (https://github.com/jrjohn/arcana-arch-qube) scans the source for layer-direction,
+DI, DTO and naming violations and scores it; usage guide:
+https://github.com/jrjohn/arcana-skills/tree/main/arch-qube-skill. The version is pinned in
+`tools/arch-qube.version` (0.5.6), read by both `tools/arch-check.sh` and the Jenkinsfile.
+
+- Run: `tools/arch-check.sh`. It uses `ghcr.io/jrjohn/arch-qube:<version>` (public,
+  multi-arch), then `arcana.boo/arcana/arch-qube:<version>`, with the same
+  `--framework rust`, `--threshold 90` and exclusions as Jenkins stage "Architecture Qube".
+  Exit 0 = pass, 1 = fail, 2 = could not run (no Docker / neither image pullable) — 2 is
+  **not** a pass. There is no `:latest` fallback on purpose.
+- Without Docker: on a tree without `target/`, `coverage/`, `.scannerwork/`, run
+  `pipx run --spec git+https://github.com/jrjohn/arcana-arch-qube.git@v0.5.6 arch-qube scan . --framework rust --no-ai --ci --format json,markdown -o arch-qube-reports --threshold 90`.
+- Report: `arch-qube-reports/arch-qube.md` (summary) and `arch-qube.json` (per rule:
+  `files_checked`, violations). PASS needs the score ≥ threshold **and** zero violations in
+  every critical rule — a 99.4 can still FAIL. Read it rule by rule:
+  - a rule under "Not evaluated" (here: Controller Uses DTO, MVVM I/O/E Structure, MVVM I/O/E
+    Models Binding, 4-Layer Progressive Cache, Offline-First Design, Defense-in-Depth
+    Security — AI-only with `--no-ai`) is **not** a pass for code you touched; review it by
+    hand against §3;
+  - a rule with `files_checked: 0` checked nothing;
+  - an unlayered project scores 0 on "Layer Direction Enforcement".
+- `--ci` prints nothing on failure. Rerun without `--ci` (or open `arch-qube.md`) to see why.
+- In a product made by `new-app.sh`, `arch-qube.yaml` maps the renamed `<name>-rest` /
+  `<name>-grpc` / `<name>-core` crates to their layers; deleting it makes the REST crate scan
+  as unlayered and the gate fail.
+- False positive: open an issue on arcana-arch-qube with the report attached. Never lower
+  `--threshold`, add exclusions, or move code to dodge a rule.
+
+## 5. Before you say "done"
 
 Run these, in this order, and paste the last line of each into your summary:
 
 ```bash
-tools/arch-check.sh                                       # same image, --framework rust, --threshold 90 as CI; must print "arch-check: PASS"
+tools/arch-check.sh                                       # pinned image, --framework rust, --threshold 90 as CI (§4); must print "arch-check: PASS"
 cargo test --workspace --lib --bins --no-fail-fast        # what the CI test lane runs
 cargo clippy --workspace --lib --bins -- -D warnings      # the CI clippy gate (pedantic via [workspace.lints])
 ```
@@ -74,14 +104,9 @@ cargo clippy --workspace --lib --bins -- -D warnings      # the CI clippy gate (
 Without a local toolchain, run the identical lane in Docker:
 `docker compose -f docker-compose.test.yml build test && docker compose -f docker-compose.test.yml run --rm test`.
 
-`arch-check.sh` exiting 2 means "could not check" (no Docker), which is not a pass. A rule
-listed as "Not evaluated" in `arch-qube-reports/arch-qube.md` for a layer you touched means
-not done. Do not lower `--threshold`, add exclusions or `#[allow]` without a reason to get a
-pass — fix the structure. In a product made by `new-app.sh`, `arch-qube.yaml` maps the
-renamed `<name>-rest` / `<name>-grpc` / `<name>-core` crates to their layers; deleting it makes
-the REST crate scan as unlayered and the gate fail.
+`arch-check.sh` exiting 2 means "could not check" (no Docker), which is not a pass; see §4.
 
-## 5. Reference
+## 6. Reference
 
 - Optional detail: `arcana-rust-developer-skill`
   (https://github.com/jrjohn/arcana-skills/tree/main/arcana-rust-developer-skill).

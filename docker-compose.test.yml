@@ -51,5 +51,5 @@ services:
       - |
         cargo llvm-cov --lib --workspace --no-fail-fast \
           --lcov --output-path /output/lcov.info \
-          --ignore-filename-regex 'generated|proto|target' \
-          2>&1 || true
+          --ignore-filename-regex 'generated|proto|target'
+        # no `|| true`: a failing test must make `docker compose run coverage` exit non-zero
