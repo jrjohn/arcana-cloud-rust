@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.64...v1.2.0) (2026-11-24)
+
+
+### Features
+
+* make the template self-explaining to AI coding agents ([#257](https://github.com/jrjohn/arcana-cloud-rust/issues/257)) ([8daa75d](https://github.com/jrjohn/arcana-cloud-rust/commit/8daa75d553e029fd9a5260b5d78364ba4d985247))
+
 ## [1.1.64](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.63...v1.1.64) (2026-11-24)
 
 
