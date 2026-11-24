@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.64](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.63...v1.1.64) (2026-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate hyper to v1.13.0 ([#261](https://github.com/jrjohn/arcana-cloud-rust/issues/261)) ([78fa801](https://github.com/jrjohn/arcana-cloud-rust/commit/78fa8019203daa3d991a85afb4be1637c615d67e))
+* **deps:** update rust crate redis to v1.8.3 ([#260](https://github.com/jrjohn/arcana-cloud-rust/issues/260)) ([d60cd20](https://github.com/jrjohn/arcana-cloud-rust/commit/d60cd20fbba7f01a5bd015a7911db5dfa976c7d0))
+
 ## [1.1.63](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.62...v1.1.63) (2026-11-23)
 
 
