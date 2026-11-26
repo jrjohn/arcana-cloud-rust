@@ -69,10 +69,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cb931c189b85683d69a5cfad41d4d418671e1ac413dd209f3f2fc31e3cfd902"
 
 [[package]]
-name = "anymap2"
-version = "0.13.0"
+name = "anymap3"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d301b3b94cb4b2f23d7917810addbbaff90738e0ca2be692bd027e70d7e0330c"
+checksum = "fb5dfbc6d8d2675589ccbe4d0fd61df2419075625f8c1a62325e718e2b0049f9"
 
 [[package]]
 name = "arbitrary"
@@ -4756,11 +4756,11 @@ dependencies = [
 
 [[package]]
 name = "shaku"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a53439ced3494971c8fd8c314cc526adbf6b924cfa0906e996752f13e36a65c"
+checksum = "4b84c01d044e6956303aeeec305841edd41c7d238c2ae71a9581e3b52ecdd2e8"
 dependencies = [
- "anymap2",
+ "anymap3",
  "shaku_derive",
 ]
 
