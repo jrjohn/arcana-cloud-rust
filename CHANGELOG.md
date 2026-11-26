@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.2.0...v1.3.0) (2026-11-26)
+
+
+### Features
+
+* enforce arch-check locally (Claude Code Stop hook + pre-push) ([#267](https://github.com/jrjohn/arcana-cloud-rust/issues/267)) ([65a9d55](https://github.com/jrjohn/arcana-cloud-rust/commit/65a9d55bcdcdb3d4242cc9820ff088a02e67964a))
+
+
+### Bug Fixes
+
+* **deps:** update rust crate toml to v1.2.3 ([#268](https://github.com/jrjohn/arcana-cloud-rust/issues/268)) ([fecccd6](https://github.com/jrjohn/arcana-cloud-rust/commit/fecccd615aabad6957b84fd472ea83c7b4d9ba94))
+
 ## [1.2.0](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.1.64...v1.2.0) (2026-11-24)
 
 
