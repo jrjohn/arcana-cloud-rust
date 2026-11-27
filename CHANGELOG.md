@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.3.0...v1.3.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate shaku to v0.6.4 ([#270](https://github.com/jrjohn/arcana-cloud-rust/issues/270)) ([ea7dcc9](https://github.com/jrjohn/arcana-cloud-rust/commit/ea7dcc97765db3d9e246e5d48ba73cb7aec8c81a))
+
 ## [1.3.0](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.2.0...v1.3.0) (2026-11-26)
 
 
