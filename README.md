@@ -1,25 +1,25 @@
 # Arcana Cloud Rust
 
-[![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-8.95%2F10-brightgreen)](https://github.com/jrjohn/arcana-cloud-rust#architecture-evaluation)
-[![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust)](https://www.rust-lang.org/)
-[![Tokio](https://img.shields.io/badge/Tokio-1.52-blue)](https://tokio.rs/)
-[![Axum](https://img.shields.io/badge/Axum-0.8-blue)](https://github.com/tokio-rs/axum)
-[![Tonic](https://img.shields.io/badge/Tonic-0.14-blue)](https://github.com/hyperium/tonic)
-[![Wasmtime](https://img.shields.io/badge/Wasmtime-51-purple)](https://wasmtime.dev/)
-[![Tests](https://img.shields.io/badge/Tests-694%20passing-success)](https://github.com/jrjohn/arcana-cloud-rust)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Architecture Rating](.github/badges/architecture-rating-8-95-10-brightgreen-8d8006ea.svg)](https://github.com/jrjohn/arcana-cloud-rust#architecture-evaluation)
+[![Rust](.github/badges/rust-1-75-orange-893ab2cb.svg)](https://www.rust-lang.org/)
+[![Tokio](.github/badges/tokio-1-52-blue-a33b268e.svg)](https://tokio.rs/)
+[![Axum](.github/badges/axum-0-8-blue-06ad5ec0.svg)](https://github.com/tokio-rs/axum)
+[![Tonic](.github/badges/tonic-0-14-blue-f4f15430.svg)](https://github.com/hyperium/tonic)
+[![Wasmtime](.github/badges/wasmtime-51-purple-9da1efef.svg)](https://wasmtime.dev/)
+[![Tests](.github/badges/tests-694-passing-success-673ad745.svg)](https://github.com/jrjohn/arcana-cloud-rust)
+[![License](.github/badges/license-mit-blue-svg-fd43213b.svg)](LICENSE)
 
 <!-- agent-managed badges START -->
 <p align="center">
-  <a href="https://arcana.boo/sonarqube/dashboard?id=rust-app"><img src="https://img.shields.io/badge/Quality_Gate-OK-brightgreen?style=for-the-badge" alt="Quality Gate"></a>
-  <a href="https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/"><img src="https://img.shields.io/badge/Build-passing-brightgreen?style=for-the-badge" alt="Build"></a>
+  <a href="https://arcana.boo/sonarqube/dashboard?id=rust-app"><img src=".github/badges/quality-gate-ok-brightgreen-7365c32e.svg" alt="Quality Gate"></a>
+  <a href="https://arcana.boo/jenkins/job/rust-app-pipeline-mb/job/main/"><img src=".github/badges/build-passing-brightgreen-f2a434e1.svg" alt="Build"></a>
 </p>
 <!-- agent-managed badges END -->
 <!-- arch-rank START -->
 <p align="center">
-  <img src="https://img.shields.io/badge/arch--qube-100.0%2F100-blue?style=for-the-badge" alt="arch-qube">
-  <img src="https://img.shields.io/badge/Grade-A%2B-brightgreen?style=for-the-badge" alt="Grade">
-  <img src="https://img.shields.io/badge/Arch_Gate-PASS-brightgreen?style=for-the-badge" alt="Architecture Gate">
+  <img src=".github/badges/arch-qube-100-0-100-blue-61d09e06.svg" alt="arch-qube">
+  <img src=".github/badges/grade-a-brightgreen-1f1e6c73.svg" alt="Grade">
+  <img src=".github/badges/arch-gate-pass-brightgreen-887cab17.svg" alt="Architecture Gate">
 </p>
 <!-- arch-rank END -->
 
