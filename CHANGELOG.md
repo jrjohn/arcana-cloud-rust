@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.3.1...v1.3.2) (2026-11-28)
+
+
+### Bug Fixes
+
+* **deps:** update rust to v1.100.1 ([#273](https://github.com/jrjohn/arcana-cloud-rust/issues/273)) ([b4bc96a](https://github.com/jrjohn/arcana-cloud-rust/commit/b4bc96a88e306e98dbfb060c5fd0c175c8b21303))
+
 ## [1.3.1](https://github.com/jrjohn/arcana-cloud-rust/compare/v1.3.0...v1.3.1) (2026-11-27)
 
 
